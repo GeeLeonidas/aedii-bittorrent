@@ -5,6 +5,7 @@
 import socket as skt
 
 PORT = 33333
+CHUNK_SIZE = 1 << 18 # 2^18 = 262144
 
 ## Conecta à DHT
 ## Retorna: O id do cliente
@@ -12,8 +13,6 @@ def connect(target_ip: str) -> int:
     s = skt.socket(skt.AF_INET)
     s.connect((target_ip, PORT))
     # TODO: Propagar a divulgação do novo nó
-
-CHUNK_SIZE = 1 << 18 # 2^18 = 262144
 
 ## Pega um pedaço do arquivo, tamanho definido por `CHUNK_SIZE`
 def get_chunk(filename: str, idx: int) -> str:
@@ -26,12 +25,11 @@ def get_chunk(filename: str, idx: int) -> str:
 def add_file(filename: str) -> list:
     res = []
     idx = 0
-    while True:
-        chunk = get_chunk(filename, idx)
-        if chunk == '':
-            break
+    chunk = get_chunk(filename, 0)
+    while chunk != '':
         chunk_hash = hash(chunk)
         # TODO: Inserir o hash do pedaço à DHT (tratando colisões)
         res.append(chunk_hash)
         idx += 1
+        chunk = get_chunk(filename, idx)
     return res
