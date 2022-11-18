@@ -7,3 +7,9 @@ class Message:
         assert len(type) == len(OK)
         self.type = type
         self.content = content
+
+def ok_message():
+    return Message(OK, '')
+
+def new_node_message():
+    return Message(NEW_NODE, '')
