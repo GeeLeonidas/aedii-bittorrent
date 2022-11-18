@@ -15,5 +15,5 @@ def ok_message():
 def new_node_message(addr: tuple):
     return Message(NEW_NODE, f'{addr[0]}:{addr[1]}')
 
-def new_move_in_message(prev: tuple, next: tuple):
+def move_in_message(prev: tuple, next: tuple):
     return Message(MOVE_IN, f'{prev[0]}:{prev[1]}:{next[0]}:{next[1]}')
