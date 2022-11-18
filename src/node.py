@@ -13,7 +13,7 @@ class Node:
         self.prev = None
         self.next = None
 
-    def handle_message(self, msg: Message):
+    def handle_message(self, sender: tuple, msg: Message):
         if msg.type == message.MOVE_IN:
             pass # TODO: Atribuir `prev` e `next` presentes em `msg.content` ao nó
         elif msg.type == message.NEW_NODE:
@@ -67,5 +67,5 @@ class Node:
                         break 
                     
                     msg: Message = pk.loads(msg_data)
-                    self.handle_message(msg)
+                    self.handle_message(addr, msg)
                     conn.sendall(pk.dumps(message.ok_message()))
