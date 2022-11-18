@@ -3,12 +3,13 @@ import pickle as pk
 from filechunk import CHUNK_SIZE
 from message import Message
 import message
+import sys
 
 class Node:
     def __init__(self, host: str, port: str):
         self.host = host
         self.port = port
-        self.id = hash((host, port))
+        self.id = hash((host, port)) % sys.maxsize
         self.prev = None
         self.next = None
     
@@ -30,9 +31,21 @@ class Node:
                         if self.prev == None: # `self` é a raíz da DHT
                             self.prev = self.next = addr
                         else: # Caso geral
-                            prev_id = hash(self.prev)
-                            next_id = hash(self.next)
-                            dist_prev = abs(self.id - prev_id)
-                            dist_next = abs(self.id - next_id)
-                            # TODO
-                    conn.sendall(message.OK)
+                            new_id = hash(addr) % sys.maxsize
+                            if new_id == self.id:
+                                pass # TODO: Tratamento de colisões
+                            dist_direct = abs(new_id - self.id) # Distância sem passar pela origem
+                            dist_wrapped = sys.maxsize - new_id + self.id # Distância passando pela origem
+                            if dist_direct <= dist_wrapped:
+                                if new_id < self.id: # prev
+                                    pass # TODO
+                                else: # next
+                                    pass # TODO
+                            else:
+                                if new_id > self.id: # prev
+                                    pass # TODO
+                                else: # next
+                                    pass # TODO
+
+
+                    conn.sendall(pk.dumps(Message(message.OK, '')))
