@@ -11,5 +11,5 @@ class Message:
 def ok_message():
     return Message(OK, '')
 
-def new_node_message():
-    return Message(NEW_NODE, '')
+def new_node_message(new_node = ''):
+    return Message(NEW_NODE, new_node)
