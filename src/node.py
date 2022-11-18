@@ -13,6 +13,31 @@ class Node:
         self.prev = None
         self.next = None
     
+    def handle_message(self, addr: tuple, msg: Message):
+        if msg.type == message.NEW_NODE:
+            if self.prev == None: # `self` é a raíz da DHT
+                self.prev = self.next = addr
+            else: # Caso geral
+                new_id = hash(addr) % sys.maxsize
+                if new_id == self.id:
+                    return # TODO: Tratamento de colisões
+                
+                dist_direct = abs(new_id - self.id) # Distância sem passar pela origem
+                dist_wrapped = sys.maxsize - new_id + self.id # Distância passando pela origem
+
+                prev_id = hash(self.prev) % sys.maxsize
+                next_id = hash(self.next) % sys.maxsize
+                if dist_direct <= dist_wrapped:
+                    if new_id < self.id: # prev
+                        pass # TODO
+                    else: # next
+                        pass # TODO
+                else:
+                    if new_id > self.id: # prev
+                        pass # TODO
+                    else: # next
+                        pass # TODO
+
     def listen(self):
         s = skt.socket(skt.AF_INET, skt.SOCK_STREAM)
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
@@ -27,25 +52,6 @@ class Node:
                         break 
                     
                     msg: Message = pk.loads(msg_data)
-                    if msg.type == message.NEW_NODE:
-                        if self.prev == None: # `self` é a raíz da DHT
-                            self.prev = self.next = addr
-                        else: # Caso geral
-                            new_id = hash(addr) % sys.maxsize
-                            if new_id == self.id:
-                                pass # TODO: Tratamento de colisões
-                            dist_direct = abs(new_id - self.id) # Distância sem passar pela origem
-                            dist_wrapped = sys.maxsize - new_id + self.id # Distância passando pela origem
-                            if dist_direct <= dist_wrapped:
-                                if new_id < self.id: # prev
-                                    pass # TODO
-                                else: # next
-                                    pass # TODO
-                            else:
-                                if new_id > self.id: # prev
-                                    pass # TODO
-                                else: # next
-                                    pass # TODO
-
+                    self.handle_message(addr, msg)
 
                     conn.sendall(pk.dumps(Message(message.OK, '')))
