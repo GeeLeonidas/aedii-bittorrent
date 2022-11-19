@@ -1,6 +1,5 @@
 import socket as skt
 import pickle as pk
-from filechunk import CHUNK_SIZE
 from message import Message
 import message
 import sys
@@ -89,7 +88,6 @@ class Node:
                     msg_data = conn.recv(1024)
                     if not msg_data: # Finalizou a conexão
                         break 
-                    
                     msg: Message = pk.loads(msg_data)
                     self.handle_message(addr, msg)
                     conn.sendall(pk.dumps(message.ok_message()))
