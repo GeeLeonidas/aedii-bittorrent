@@ -34,9 +34,9 @@ class Node:
 
     def handle_message(self, msg: Message):
         if msg.type == message.MOVE_IN:
-            prev_id, prev_port, next_id, next_port = msg.content.split(':')
-            self.prev = (prev_id, int(prev_port))
-            self.next = (next_id, int(next_port))
+            prev_ip, prev_port, next_ip, next_port = msg.content.split(':')
+            self.prev = (prev_ip, int(prev_port))
+            self.next = (next_ip, int(next_port))
             
             with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
                 if msg.sender == self.next: # Foi o próximo nó que requisitou MOVE_IN
@@ -50,12 +50,12 @@ class Node:
                 assert response_msg.type == message.OK
         elif msg.type == message.UP_NEXT:
             # substitui o nó sucessor atual pelo nó adicionado na rede
-            next_id, next_port = msg.content.split(':')
-            self.next = (next_id, int(next_port))
+            next_ip, next_port = msg.content.split(':')
+            self.next = (next_ip, int(next_port))
         elif msg.type == message.UP_PREV:
             # substitui o nó anterior atual pelo nó adicionado na rede
-            next_id, next_port = msg.content.split(':')
-            self.prev = (next_id, int(next_port))
+            prev_ip, prev_port = msg.content.split(':')
+            self.prev = (prev_ip, int(prev_port))
         elif msg.type == message.NEW_NODE:
             host, port = msg.content.split(':')
             addr = (host, int(port)) # Endereço do autor original da mensagem
@@ -80,7 +80,7 @@ class Node:
                                 self.__send_new_node_message(s, addr)
                             else: # `new_id` está entre `prev_id` e `self.id`
                                 s.connect(addr)
-                                self.__send_move_in_message(s, self.prev, self.id)
+                                self.__send_move_in_message(s, self.prev, self.addr)
                                 self.prev = addr # Novo nó agora é predecessor do atual
                             response_msg_data = s.recv(1024)
                             response_msg: Message = pk.loads(response_msg_data)
@@ -91,7 +91,7 @@ class Node:
                                 self.__send_new_node_message(s, addr)
                             else: # `new_id` está entre `self.id` e `next_id`
                                 s.connect(addr)
-                                self.__send_move_in_message(s, self.id, self.next)
+                                self.__send_move_in_message(s, self.addr, self.next)
                                 self.next = addr # Novo nó agora é sucessor do atual
                             response_msg_data = s.recv(1024)
                             response_msg: Message = pk.loads(response_msg_data)
