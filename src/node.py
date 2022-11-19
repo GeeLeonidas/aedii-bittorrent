@@ -28,6 +28,9 @@ class Node:
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
             s.connect(self.next)
             s.sendall(pk.dumps(message.echo_message(addr, self.addr)))
+            response_msg_data = s.recv(1024)
+            response_msg: Message = pk.loads(response_msg_data)
+            assert response_msg.type == message.OK ## Útil para debug
     def echo(self):
         self.__echo(self.addr)
 
@@ -74,6 +77,13 @@ class Node:
 
             if self.prev == None: # `self` é a raíz da DHT
                 self.prev = self.next = addr
+                with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
+                    s.connect(addr) # Dizer para o novo nó como se atualizar
+                    self.__send_up_next_message(s, self.addr)
+                    self.__send_up_prev_message(s, self.addr)
+                    response_msg_data = s.recv(1024)
+                    response_msg: Message = pk.loads(response_msg_data)
+                    assert response_msg.type == message.OK ## Útil para debug
             else: # Caso geral
                 new_id = hash(addr) % sys.maxsize
                 if new_id == self.id:
@@ -136,6 +146,6 @@ class Node:
                         if not msg_data: # Finalizou a conexão
                             break
                         msg: Message = pk.loads(msg_data)
-                        print(f'{self.addr} recebeu mensagem de {msg.sender}')
+                        print(f'{msg.sender} enviou mensagem para {self.addr}')
                         self.handle_message(msg)
                         self.__send_ok_message(conn)

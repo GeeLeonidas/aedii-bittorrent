@@ -7,7 +7,7 @@ BASE_PORT = 30000
 if __name__ == "__main__":
     nodes = []
     threads = []
-    for i in range(5):
+    for i in range(3):
         nodes.append(nd.Node(('127.0.0.1', BASE_PORT+i)))
         threads.append(thr.Thread(target=nodes[i].listen))
         threads[i].start()
