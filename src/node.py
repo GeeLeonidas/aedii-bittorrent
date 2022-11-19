@@ -23,6 +23,8 @@ class Node:
         s.sendall(pk.dumps(message.up_next_message(next, self.addr)))
     def __send_up_prev_message(self, s, prev: tuple):
         s.sendall(pk.dumps(message.up_prev_message(prev, self.addr)))
+    def __send_up_pair_message(self, s):
+        s.sendall(pk.dumps(message.up_pair_message(self.addr)))
     
     def __echo(self, addr: tuple):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
@@ -71,6 +73,8 @@ class Node:
             # substitui o nó anterior atual pelo nó adicionado na rede
             prev_ip, prev_port = msg.content.split(':')
             self.prev = (prev_ip, int(prev_port))
+        elif msg.type == message.UP_PAIR:
+            self.prev = self.next = msg.sender
         elif msg.type == message.NEW_NODE:
             host, port = msg.content.split(':')
             addr = (host, int(port)) # Endereço do autor original da mensagem
@@ -79,8 +83,7 @@ class Node:
                 self.prev = self.next = addr
                 with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
                     s.connect(addr) # Dizer para o novo nó como se atualizar
-                    self.__send_up_next_message(s, self.addr)
-                    self.__send_up_prev_message(s, self.addr)
+                    self.__send_up_pair_message(s)
                     response_msg_data = s.recv(1024)
                     response_msg: Message = pk.loads(response_msg_data)
                     assert response_msg.type == message.OK ## Útil para debug

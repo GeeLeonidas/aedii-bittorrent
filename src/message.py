@@ -4,7 +4,8 @@ NEW_NODE    = b'\x01'
 MOVE_IN     = b'\x02'
 UP_NEXT     = b'\x03'
 UP_PREV     = b'\x04'
-ECHO        = b'\x05'
+UP_PAIR     = b'\x05' # Para quando a DHT possui apenas um par de nós
+ECHO        = b'\x06'
 
 class Message:
     def __init__(self, type: bytes, content: str, sender: tuple):
@@ -27,6 +28,9 @@ def up_next_message(next: tuple, sender: tuple):
 
 def up_prev_message(prev: tuple, sender: tuple):
     return Message(UP_PREV, f'{prev[0]}:{prev[1]}', sender)
+
+def up_pair_message(sender: tuple):
+    return Message(UP_PAIR, '', sender)
 
 def echo_message(addr: tuple, sender: tuple):
     return Message(ECHO, f'{addr[0]}:{addr[1]}', sender)
