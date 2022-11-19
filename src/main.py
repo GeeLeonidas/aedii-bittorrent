@@ -8,13 +8,14 @@ CMD_PREFIX = '>> '
 if __name__ == "__main__":
     nodes = []
     threads = []
-    for i in range(3):
+    node_count = int(input('Node count: '))
+    for i in range(node_count):
         nodes.append(nd.Node(('127.0.0.1', BASE_PORT+i)))
         threads.append(thr.Thread(target=nodes[i].listen))
     for t in threads:
         t.start()
 
-    for i in range(1, len(nodes)):
+    for i in range(1, node_count):
         nodes[i].enter_dht(nodes[0].addr)
         sleep(1)
     
