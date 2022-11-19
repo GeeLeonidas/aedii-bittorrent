@@ -52,9 +52,9 @@ class Node:
 
                 prev_id = hash(self.prev) % sys.maxsize
                 next_id = hash(self.next) % sys.maxsize
-                if dist_direct <= dist_wrapped:
-                    if new_id < self.id: # prev
-                        with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
+                with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
+                    if dist_direct <= dist_wrapped:
+                        if new_id < self.id: # prev
                             if new_id < prev_id: # Continue propagando a mensagem para trás
                                 s.connect(self.prev)
                                 s.sendall(pk.dumps(message.new_node_message(addr)))
@@ -65,8 +65,7 @@ class Node:
                             response_msg_data = s.recv(1024)
                             response_msg: Message = pk.loads(response_msg_data)
                             assert response_msg.type == message.OK ## Útil para debug
-                    else: # next
-                        with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
+                        else: # next
                             if new_id > next_id: # Continue propagando a mensagem para frente
                                 s.connect(self.next)
                                 s.sendall(pk.dumps(message.new_node_message(addr)))
@@ -77,11 +76,17 @@ class Node:
                             response_msg_data = s.recv(1024)
                             response_msg: Message = pk.loads(response_msg_data)
                             assert response_msg.type == message.OK ## Útil para debug                                
-                else:
-                    if new_id > self.id: # prev
-                        pass # TODO
-                    else: # next
-                        pass # TODO
+                    else:
+                        if new_id > self.id: # prev
+                            # Propaga para trás até passar da origem
+                            s.connect(self.prev)
+                        else: # next
+                            # Propaga para frente até passar da origem
+                            s.connect(self.next)
+                        s.sendall(pk.dumps(message.new_node_message(addr)))
+                        response_msg_data = s.recv(1024)
+                        response_msg: Message = pk.loads(response_msg_data)
+                        assert response_msg.type == message.OK ## Útil para debug
 
     def listen(self):
         s = skt.socket(skt.AF_INET, skt.SOCK_STREAM)
