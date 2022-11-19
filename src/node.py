@@ -16,7 +16,6 @@ class Node:
         self.prev = None
         self.next = None
         self.alive = True
-        self.socket = skt.socket(skt.AF_INET, skt.SOCK_STREAM)
 
     # Atalhos para mandar mensagem a um nó
     def __send_ok_message(self, s):
@@ -143,20 +142,21 @@ class Node:
                         assert response_msg.type == message.OK ## Útil para debug
 
     def listen(self):
-        self.socket.bind(self.addr)
-        self.socket.listen()
-        self.socket.settimeout(1) # Adiciona um delay (em seg.) para ele verificar se `self.alive` é verdadeiro
-        while self.alive:
-            try:
-                conn, conn_addr = self.socket.accept()
-            except TimeoutError:
-                continue
-            with conn:
-                while True:
-                    msg_data = conn.recv(1024)
-                    if not msg_data: # Finalizou a conexão
-                        break
-                    msg: Message = pk.loads(msg_data)
-                    print(f'{msg.sender} enviou mensagem para {self.addr}')
-                    self.handle_message(msg)
-                    self.__send_ok_message(conn)
+        with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
+            s.bind(self.addr)
+            s.listen()
+            s.settimeout(1) # Adiciona um delay (em seg.) para ele verificar se `self.alive` é verdadeiro
+            while self.alive:
+                try:
+                    conn, conn_addr = s.accept()
+                except TimeoutError:
+                    continue
+                with conn:
+                    while True:
+                        msg_data = conn.recv(1024)
+                        if not msg_data: # Finalizou a conexão
+                            break
+                        msg: Message = pk.loads(msg_data)
+                        print(f'{msg.sender} enviou mensagem para {self.addr}')
+                        self.handle_message(msg)
+                        self.__send_ok_message(conn)
