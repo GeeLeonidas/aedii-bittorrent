@@ -28,3 +28,4 @@ if __name__ == "__main__":
         cmd = input(CMD_PREFIX)
     for node in nodes:
         node.alive = False
+        node.socket.close()
