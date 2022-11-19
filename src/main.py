@@ -1,21 +1,14 @@
-import peers as p
-import P2P as p2p
-import threading as thd
-import time
+import threading as thr
+import node as nd
 
+BASE_PORT = 33333
 
 if __name__ == "__main__":
-
-    ## enter port number
-    p2p.PORT = int(input('Digite a porta: '))
-
-    ## start listening thread
-    t = thd.Thread(target=p2p.listen)
-    t.start()
-
-    ## enter ip and port of the peer to send a message to
-    ip = input('Digite o ip do peer: ')
-    port = int(input('Digite a porta do peer: '))
-    p2p.send_test(ip, port)
-
-    pass
+    nodes = []
+    threads = []
+    for i in range(5):
+        nodes.append(nd.Node('127.0.0.1', str(BASE_PORT+i)))
+        threads.append(thr.Thread(target=nodes[i].listen))
+        threads[i].start()
+    for i in range(1, len(nodes)):
+        nodes[i].enter_dht((nodes[0].host, nodes[0].port))

@@ -12,6 +12,14 @@ class Node:
         self.prev = None
         self.next = None
 
+    def enter_dht(self, know_node: tuple):
+        with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
+            s.connect(know_node)
+            s.sendall(pk.dumps(message.new_node_message((self.host, self.port))))
+            response_msg_data = s.recv(1024)
+            response_msg: Message = pk.loads(response_msg_data)
+            assert response_msg.type == message.OK
+
     def handle_message(self, sender: tuple, msg: Message):
         if msg.type == message.MOVE_IN:
             prev_id, prev_port, next_id, next_port = msg.content.split(':')
