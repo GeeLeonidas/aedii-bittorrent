@@ -6,6 +6,7 @@ UP_NEXT     = b'\x03'
 UP_PREV     = b'\x04'
 UP_PAIR     = b'\x05' # Para quando a DHT possui apenas um par de nós
 ECHO        = b'\x06'
+GET_FILE    = b'\x07'
 
 class Message:
     def __init__(self, type: bytes, content: str, sender: tuple):
@@ -34,3 +35,9 @@ def up_pair_message(sender: tuple):
 
 def echo_message(addr: tuple, sender: tuple):
     return Message(ECHO, f'{addr[0]}:{addr[1]}', sender)
+
+def get_file_message(filename: str, idx: int):
+    return Message(GET_FILE, f'{filename}:{idx}', '')
+
+def get_file_response(content: tuple, sender: tuple):
+    return Message(GET_FILE, content, sender) # content deve ter o formato (chunk, idx, final)
