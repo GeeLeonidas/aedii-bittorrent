@@ -19,3 +19,18 @@ def add_file(filename: str) -> list:
         idx += 1
         chunk = get_chunk(filename, idx)
     return res
+
+## Retorna uma lista com os hashes dos pedaços do arquivo
+def get_file(filename: str) -> list:
+    res = []
+    idx = 0
+    chunk = get_chunk(filename, 0)
+    while chunk != '':
+        chunk_hash = hash(chunk)
+        res.append(chunk_hash)
+        idx += 1
+        chunk = get_chunk(filename, idx)
+    return res
+
+## TODO reconstruct file from chunks
+            
