@@ -96,6 +96,7 @@ class Node:
             else: # Caso geral
                 new_id = get_id(addr)
                 if new_id == self.id:
+                    self.__send_ok_message(clSocket)
                     return # TODO: Tratamento de colisões
                 
                 dist_direct = abs(new_id - self.id) # Distância sem passar pela origem
