@@ -3,6 +3,7 @@ OK          = b'\x00'
 NEW_NODE    = b'\x01'
 MOVE_IN     = b'\x02'
 UP_NEXT     = b'\x03'
+UP_PREV     = b'\x04'
 
 class Message:
     def __init__(self, type: bytes, content: str):
@@ -21,3 +22,6 @@ def move_in_message(prev: tuple, next: tuple):
 
 def up_next_message(next: tuple):
     return Message(UP_NEXT, f'{next[0]}:{next[1]}')
+
+def up_prev_message(prev: tuple):
+    return Message(UP_PREV, f'{prev[0]}:{prev[1]}')

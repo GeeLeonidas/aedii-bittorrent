@@ -18,10 +18,13 @@ class Node:
             self.prev = (prev_id, prev_port)
             self.next = (next_id, next_port)
             
-            # envia mensagem up_next para o nó predecessor
             with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
-                s.connect((self.prev[0], self.prev[1]))
-                s.sendall(pk.dumps(message.up_next_message((self.host, self.port))))
+                if sender == self.next: # Foi o próximo nó que requisitou MOVE_IN
+                    s.connect(self.prev)
+                    s.sendall(pk.dumps(message.up_next_message((self.host, self.port))))
+                else: # Foi o nó anterior que requisitou MOVE_IN
+                    s.connect(self.next)
+                    s.sendall(pk.dumps(message.up_prev_message((self.host, self.port))))                  
                 response_msg_data = s.recv(1024)
                 response_msg: Message = pk.loads(response_msg_data)
                 assert response_msg.type == message.OK
@@ -29,6 +32,10 @@ class Node:
             # substitui o nó sucessor atual pelo nó adicionado na rede
             next_id, next_port = msg.content.split(':')
             self.next = (next_id, next_port)
+        elif msg.type == message.UP_PREV:
+            # substitui o nó anterior atual pelo nó adicionado na rede
+            next_id, next_port = msg.content.split(':')
+            self.prev = (next_id, next_port)
         elif msg.type == message.NEW_NODE:
             host, port = msg.content.split(':')
             addr = (host, port) # Endereço do autor original da mensagem
