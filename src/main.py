@@ -12,3 +12,4 @@ if __name__ == "__main__":
         threads[i].start()
     for i in range(1, len(nodes)):
         nodes[i].enter_dht((nodes[0].host, nodes[0].port))
+    # TODO: Interação via comandos com a DHT

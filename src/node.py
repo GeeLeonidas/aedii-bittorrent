@@ -11,6 +11,7 @@ class Node:
         self.id = hash((host, port)) % sys.maxsize
         self.prev = None
         self.next = None
+        self.alive = True
 
     def enter_dht(self, know_node: tuple):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
@@ -100,14 +101,15 @@ class Node:
         s = skt.socket(skt.AF_INET, skt.SOCK_STREAM)
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
             s.bind((self.host, self.port))
-            s.listen()
-            conn, addr = s.accept()
-            with conn:
-                print(f'Conectado a {addr}')
-                while True:
-                    msg_data = conn.recv(1024)
-                    if not msg_data: # Finalizou a conexão
-                        break 
-                    msg: Message = pk.loads(msg_data)
-                    self.handle_message(addr, msg)
-                    conn.sendall(pk.dumps(message.ok_message()))
+            while self.alive:
+                s.listen()
+                conn, addr = s.accept()
+                with conn:
+                    print(f'Conectado a {addr}')
+                    while True:
+                        msg_data = conn.recv(1024)
+                        if not msg_data: # Finalizou a conexão
+                            break 
+                        msg: Message = pk.loads(msg_data)
+                        self.handle_message(addr, msg)
+                        conn.sendall(pk.dumps(message.ok_message()))
