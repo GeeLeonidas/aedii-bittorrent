@@ -23,8 +23,8 @@ class Node:
     def handle_message(self, sender: tuple, msg: Message):
         if msg.type == message.MOVE_IN:
             prev_id, prev_port, next_id, next_port = msg.content.split(':')
-            self.prev = (prev_id, prev_port)
-            self.next = (next_id, next_port)
+            self.prev = (prev_id, int(prev_port))
+            self.next = (next_id, int(next_port))
             
             with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
                 if sender == self.next: # Foi o próximo nó que requisitou MOVE_IN
@@ -39,14 +39,14 @@ class Node:
         elif msg.type == message.UP_NEXT:
             # substitui o nó sucessor atual pelo nó adicionado na rede
             next_id, next_port = msg.content.split(':')
-            self.next = (next_id, next_port)
+            self.next = (next_id, int(next_port))
         elif msg.type == message.UP_PREV:
             # substitui o nó anterior atual pelo nó adicionado na rede
             next_id, next_port = msg.content.split(':')
-            self.prev = (next_id, next_port)
+            self.prev = (next_id, int(next_port))
         elif msg.type == message.NEW_NODE:
             host, port = msg.content.split(':')
-            addr = (host, port) # Endereço do autor original da mensagem
+            addr = (host, int(port)) # Endereço do autor original da mensagem
 
             if self.prev == None: # `self` é a raíz da DHT
                 self.prev = self.next = addr
