@@ -17,7 +17,7 @@ if __name__ == "__main__":
 
     for i in range(1, node_count):
         nodes[i].enter_dht(nodes[0].addr)
-        sleep(1)
+        sleep(0.1)
     
     cmd = input(CMD_PREFIX)
     while cmd != 'exit':
