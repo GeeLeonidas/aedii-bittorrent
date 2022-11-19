@@ -4,10 +4,15 @@ from message import Message
 import message
 import sys
 
+def get_id(addr: tuple) -> int:
+    ip1, ip2, ip3, ip4 = addr[0].split('.')
+    addr_conv = (ip1, ip2, ip3, ip4, addr[1])
+    return hash(addr_conv) % sys.maxsize
+
 class Node:
     def __init__(self, addr: tuple):
         self.addr = addr
-        self.id = hash(addr) % sys.maxsize
+        self.id = get_id(addr)
         self.prev = None
         self.next = None
         self.alive = True
@@ -88,15 +93,18 @@ class Node:
                     response_msg: Message = pk.loads(response_msg_data)
                     assert response_msg.type == message.OK ## Útil para debug
             else: # Caso geral
-                new_id = hash(addr) % sys.maxsize
+                new_id = get_id(addr)
                 if new_id == self.id:
                     return # TODO: Tratamento de colisões
                 
                 dist_direct = abs(new_id - self.id) # Distância sem passar pela origem
-                dist_wrapped = sys.maxsize - new_id + self.id # Distância passando pela origem
+                if new_id > self.id: # Distância passando pela origem
+                    dist_wrapped = sys.maxsize - new_id + self.id # Sentido horário
+                else:
+                    dist_wrapped = sys.maxsize + new_id - self.id # Sentido anti-horário
 
-                prev_id = hash(self.prev) % sys.maxsize
-                next_id = hash(self.next) % sys.maxsize
+                prev_id = get_id(self.prev)
+                next_id = get_id(self.next)
                 with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
                     if dist_direct <= dist_wrapped:
                         if new_id < self.id: # prev
