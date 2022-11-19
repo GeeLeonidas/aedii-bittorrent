@@ -5,10 +5,9 @@ import message
 import sys
 
 class Node:
-    def __init__(self, host: str, port: str):
-        self.host = host
-        self.port = port
-        self.id = hash((host, port)) % sys.maxsize
+    def __init__(self, addr: tuple):
+        self.addr = addr
+        self.id = hash(addr) % sys.maxsize
         self.prev = None
         self.next = None
         self.alive = True
@@ -16,7 +15,7 @@ class Node:
     def enter_dht(self, know_node: tuple):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
             s.connect(know_node)
-            s.sendall(pk.dumps(message.new_node_message((self.host, self.port))))
+            s.sendall(pk.dumps(message.new_node_message(self.addr)))
             response_msg_data = s.recv(1024)
             response_msg: Message = pk.loads(response_msg_data)
             assert response_msg.type == message.OK
@@ -30,10 +29,10 @@ class Node:
             with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
                 if sender == self.next: # Foi o próximo nó que requisitou MOVE_IN
                     s.connect(self.prev)
-                    s.sendall(pk.dumps(message.up_next_message((self.host, self.port))))
+                    s.sendall(pk.dumps(message.up_next_message(self.addr)))
                 else: # Foi o nó anterior que requisitou MOVE_IN
                     s.connect(self.next)
-                    s.sendall(pk.dumps(message.up_prev_message((self.host, self.port))))                  
+                    s.sendall(pk.dumps(message.up_prev_message(self.addr)))                  
                 response_msg_data = s.recv(1024)
                 response_msg: Message = pk.loads(response_msg_data)
                 assert response_msg.type == message.OK
@@ -100,16 +99,16 @@ class Node:
     def listen(self):
         s = skt.socket(skt.AF_INET, skt.SOCK_STREAM)
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
-            s.bind((self.host, self.port))
+            s.bind(self.addr)
             while self.alive:
                 s.listen()
-                conn, addr = s.accept()
+                conn, conn_addr = s.accept()
                 with conn:
-                    print(f'Conectado a {addr}')
+                    print(f'Conectado a {conn_addr}')
                     while True:
                         msg_data = conn.recv(1024)
                         if not msg_data: # Finalizou a conexão
                             break 
                         msg: Message = pk.loads(msg_data)
-                        self.handle_message(addr, msg)
+                        self.handle_message(msg)
                         conn.sendall(pk.dumps(message.ok_message()))
