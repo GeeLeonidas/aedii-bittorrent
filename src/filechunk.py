@@ -1,8 +1,9 @@
 CHUNK_SIZE = 1 << 18 # 2^18 = 262144
 
 ## Pega um pedaço do arquivo, tamanho definido por `CHUNK_SIZE`
-def get_chunk(filename: str, idx: int) -> str:
-    with open(filename, mode='r') as file:
+def get_chunk(filename: str, idx: int):
+    with open(filename, mode='rb') as file:
+        print("Getting chunk...")
         file.seek(CHUNK_SIZE * idx)
         return file.read(CHUNK_SIZE)
 
@@ -25,12 +26,19 @@ def get_file(filename: str) -> list:
     res = []
     idx = 0
     chunk = get_chunk(filename, 0)
-    while chunk != '':
-        chunk_hash = hash(chunk)
-        res.append(chunk_hash)
+    print("Getting file...")
+    while chunk != b'':
+        res.append(chunk)
         idx += 1
         chunk = get_chunk(filename, idx)
+        print("Chunk: ", chunk)
     return res
 
-## TODO reconstruct file from chunks
+## Reconstroi o arquivo a partir da lista de hashes
+def reconstruct_file(filename: str, chunks: list):
+    print("Reconstructing file...")
+    with open(filename, 'ab') as f:
+        for chunk in chunks:
+            f.write(chunk)
+        
             
