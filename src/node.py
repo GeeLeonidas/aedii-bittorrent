@@ -16,6 +16,7 @@ class Node:
         self.prev = None
         self.next = None
         self.alive = True
+        self.dict = {}
 
     # Atalhos para mandar mensagem a um nó
     def __send_ok_message(self, s):
@@ -49,7 +50,7 @@ class Node:
             response_msg: Message = pk.loads(response_msg_data)
             assert response_msg.type == message.OK
 
-    def handle_message(self, msg: Message):
+    def handle_message(self, msg: Message, clSocket):
         if msg.type == message.ECHO:
             ip, port = msg.content.split(':')
             addr = (ip, int(port))
@@ -140,6 +141,24 @@ class Node:
                         response_msg_data = s.recv(1024)
                         response_msg: Message = pk.loads(response_msg_data)
                         assert response_msg.type == message.OK ## Útil para debug
+        elif msg.type == message.get_file_message:
+            key = str(msg.content)
+            if key in self.dict:
+                # responde o clSocket com o valor
+                with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
+                    response_msg: Message = message.get_file_response(self.dict[key], self.addr)
+                    clSocket.sendall(pk.dumps(response_msg))
+            else:
+                # repassa a mensagem para o próximo nó
+                with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
+                    s.connect(self.next)
+                    s.sendall(pk.dumps(msg))
+                    response_msg_data = s.recv(1024)
+                    response_msg: Message = pk.loads(response_msg_data)
+                    clSocket.sendall(pk.dumps(response_msg))        
+        if(msg.type != message.get_file_message):
+            self.__send_ok_message(clSocket)
+                    
 
     def listen(self):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
@@ -159,4 +178,3 @@ class Node:
                         msg: Message = pk.loads(msg_data)
                         print(f'{msg.sender} enviou mensagem para {self.addr}')
                         self.handle_message(msg)
-                        self.__send_ok_message(conn)
