@@ -1,5 +1,6 @@
 import threading as thr
 import node as nd
+from time import sleep
 
 BASE_PORT = 30000
 
@@ -12,4 +13,15 @@ if __name__ == "__main__":
         threads[i].start()
     for i in range(1, len(nodes)):
         nodes[i].enter_dht(nodes[0].addr)
-    # TODO: Interação via comandos com a DHT
+        sleep(1)
+    
+    cmd = input('>> ')
+    while cmd != 'exit':
+        if cmd == 'echo':
+            nodes[0].echo()
+        elif cmd == 'print':
+            for node in nodes:
+                print(f'{node.prev} (prev) - {node.addr} - {node.next} (next)')
+        cmd = input('>> ')
+    for node in nodes:
+        node.alive = False

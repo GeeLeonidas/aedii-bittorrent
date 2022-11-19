@@ -23,6 +23,13 @@ class Node:
         s.sendall(pk.dumps(message.up_next_message(next, self.addr)))
     def __send_up_prev_message(self, s, prev: tuple):
         s.sendall(pk.dumps(message.up_prev_message(prev, self.addr)))
+    
+    def __echo(self, addr: tuple):
+        with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
+            s.connect(self.next)
+            s.sendall(pk.dumps(message.echo_message(addr, self.addr)))
+    def echo(self):
+        self.__echo(self.addr)
 
     def enter_dht(self, known_node: tuple):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
@@ -33,7 +40,12 @@ class Node:
             assert response_msg.type == message.OK
 
     def handle_message(self, msg: Message):
-        if msg.type == message.MOVE_IN:
+        if msg.type == message.ECHO:
+            ip, port = msg.content.split(':')
+            addr = (ip, int(port))
+            if self.addr != addr: # Se o endereço atual for o mesmo do original, a mensagem propagou pela rede toda
+                self.__echo(addr)
+        elif msg.type == message.MOVE_IN:
             prev_ip, prev_port, next_ip, next_port = msg.content.split(':')
             self.prev = (prev_ip, int(prev_port))
             self.next = (next_ip, int(next_port))
@@ -111,15 +123,19 @@ class Node:
     def listen(self):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
             s.bind(self.addr)
+            s.listen()
+            s.settimeout(1) # Adiciona um delay (em seg.) para ele verificar se `self.alive` é verdadeiro
             while self.alive:
-                s.listen()
-                conn, conn_addr = s.accept()
+                try:
+                    conn, conn_addr = s.accept()
+                except TimeoutError:
+                    continue
                 with conn:
-                    print(f'Conectado a {conn_addr}')
                     while True:
                         msg_data = conn.recv(1024)
                         if not msg_data: # Finalizou a conexão
-                            break 
+                            break
                         msg: Message = pk.loads(msg_data)
+                        print(f'{self.addr} recebeu mensagem de {msg.sender}')
                         self.handle_message(msg)
                         self.__send_ok_message(conn)
