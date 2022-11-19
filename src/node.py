@@ -12,27 +12,39 @@ class Node:
         self.next = None
         self.alive = True
 
-    def enter_dht(self, know_node: tuple):
+    # Atalhos para mandar mensagem a um nó
+    def __send_ok_message(self, s):
+        s.sendall(pk.dumps(message.ok_message(self.addr)))
+    def __send_new_node_message(self, s, addr: tuple):
+        s.sendall(pk.dumps(message.new_node_message(addr, self.addr)))
+    def __send_move_in_message(self, s, prev: tuple, next: tuple):
+        s.sendall(pk.dumps(message.move_in_message(prev, next, self.addr)))
+    def __send_up_next_message(self, s, next: tuple):
+        s.sendall(pk.dumps(message.up_next_message(next, self.addr)))
+    def __send_up_prev_message(self, s, prev: tuple):
+        s.sendall(pk.dumps(message.up_prev_message(prev, self.addr)))
+
+    def enter_dht(self, known_node: tuple):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
-            s.connect(know_node)
-            s.sendall(pk.dumps(message.new_node_message(self.addr)))
+            s.connect(known_node)
+            self.__send_new_node_message(s, self.addr)
             response_msg_data = s.recv(1024)
             response_msg: Message = pk.loads(response_msg_data)
             assert response_msg.type == message.OK
 
-    def handle_message(self, sender: tuple, msg: Message):
+    def handle_message(self, msg: Message):
         if msg.type == message.MOVE_IN:
             prev_id, prev_port, next_id, next_port = msg.content.split(':')
             self.prev = (prev_id, int(prev_port))
             self.next = (next_id, int(next_port))
             
             with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
-                if sender == self.next: # Foi o próximo nó que requisitou MOVE_IN
+                if msg.sender == self.next: # Foi o próximo nó que requisitou MOVE_IN
                     s.connect(self.prev)
-                    s.sendall(pk.dumps(message.up_next_message(self.addr)))
+                    self.__send_up_next_message(s, self.addr)
                 else: # Foi o nó anterior que requisitou MOVE_IN
                     s.connect(self.next)
-                    s.sendall(pk.dumps(message.up_prev_message(self.addr)))                  
+                    self.__send_up_prev_message(s, self.addr)                
                 response_msg_data = s.recv(1024)
                 response_msg: Message = pk.loads(response_msg_data)
                 assert response_msg.type == message.OK
@@ -65,10 +77,10 @@ class Node:
                         if new_id < self.id: # prev
                             if new_id < prev_id: # Continue propagando a mensagem para trás
                                 s.connect(self.prev)
-                                s.sendall(pk.dumps(message.new_node_message(addr)))
+                                self.__send_new_node_message(s, addr)
                             else: # `new_id` está entre `prev_id` e `self.id`
                                 s.connect(addr)
-                                s.sendall(pk.dumps(message.move_in_message(self.prev, self.id)))
+                                self.__send_move_in_message(s, self.prev, self.id)
                                 self.prev = addr # Novo nó agora é predecessor do atual
                             response_msg_data = s.recv(1024)
                             response_msg: Message = pk.loads(response_msg_data)
@@ -76,10 +88,10 @@ class Node:
                         else: # next
                             if new_id > next_id: # Continue propagando a mensagem para frente
                                 s.connect(self.next)
-                                s.sendall(pk.dumps(message.new_node_message(addr)))
+                                self.__send_new_node_message(s, addr)
                             else: # `new_id` está entre `self.id` e `next_id`
                                 s.connect(addr)
-                                s.sendall(pk.dumps(message.move_in_message(self.id, self.next)))
+                                self.__send_move_in_message(s, self.id, self.next)
                                 self.next = addr # Novo nó agora é sucessor do atual
                             response_msg_data = s.recv(1024)
                             response_msg: Message = pk.loads(response_msg_data)
@@ -91,13 +103,12 @@ class Node:
                         else: # next
                             # Propaga para frente até passar da origem
                             s.connect(self.next)
-                        s.sendall(pk.dumps(message.new_node_message(addr)))
+                        self.__send_new_node_message(s, addr)
                         response_msg_data = s.recv(1024)
                         response_msg: Message = pk.loads(response_msg_data)
                         assert response_msg.type == message.OK ## Útil para debug
 
     def listen(self):
-        s = skt.socket(skt.AF_INET, skt.SOCK_STREAM)
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
             s.bind(self.addr)
             while self.alive:
@@ -111,4 +122,4 @@ class Node:
                             break 
                         msg: Message = pk.loads(msg_data)
                         self.handle_message(msg)
-                        conn.sendall(pk.dumps(message.ok_message()))
+                        self.__send_ok_message(conn)
