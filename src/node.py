@@ -60,7 +60,17 @@ class Node:
                             response_msg: Message = pk.loads(response_msg_data)
                             assert response_msg.type == message.OK ## Útil para debug
                     else: # next
-                        pass # TODO
+                        with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
+                            if new_id > next_id: # Continue propagando a mensagem para frente
+                                s.connect(self.next)
+                                s.sendall(pk.dumps(message.new_node_message(addr)))
+                            else: # `new_id` está entre `self.id` e `next_id`
+                                s.connect(addr)
+                                s.sendall(pk.dumps(message.move_in_message(self.id, self.next)))
+                                self.next = addr # Novo nó agora é sucessor do atual
+                            response_msg_data = s.recv(1024)
+                            response_msg: Message = pk.loads(response_msg_data)
+                            assert response_msg.type == message.OK ## Útil para debug                                
                 else:
                     if new_id > self.id: # prev
                         pass # TODO
