@@ -50,7 +50,7 @@ class Node:
             response_msg: Message = pk.loads(response_msg_data)
             assert response_msg.type == message.OK
 
-    def __handle_message(self, msg: Message):
+    def __handle_message(self, msg: Message, clSocket):
         if msg.type == message.ECHO:
             ip, port = msg.content.split(':')
             addr = (ip, int(port))
@@ -144,8 +144,9 @@ class Node:
                     response_msg_data = s.recv(1024)
                     response_msg: Message = pk.loads(response_msg_data)
                     assert response_msg.type == message.OK ## Útil para debug
-        elif msg.type == message.get_file_message:
-            key = str(msg.content)
+        elif msg.type == message.GET_FILE:
+            filename, index = msg.content.split(':')
+            key = (filename, int(index))
             if key in self.dict:
                 # responde o clSocket com o valor
                 with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
@@ -158,9 +159,9 @@ class Node:
                     s.sendall(pk.dumps(msg))
                     response_msg_data = s.recv(1024)
                     response_msg: Message = pk.loads(response_msg_data)
-                    clSocket.sendall(pk.dumps(response_msg))        
-        if(msg.type != message.get_file_message):
-            self.__send_ok_message(clSocket)
+                    clSocket.sendall(pk.dumps(response_msg))
+            return
+        self.__send_ok_message(clSocket)
                     
 
     def listen(self):
@@ -180,4 +181,4 @@ class Node:
                             break
                         msg: Message = pk.loads(msg_data)
                         print(f'{msg.sender} enviou mensagem para {self.addr}')
-                        self.__handle_message(msg)
+                        self.__handle_message(msg, conn)
