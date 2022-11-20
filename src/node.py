@@ -107,8 +107,8 @@ class Node:
                     return # TODO: Tratamento de colisões
                 dist_direct, dist_warped = get_distances(new_id, self.id)
                 with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
-                    is_prev_closer = (new_id < self.id) if dist_direct <= dist_warped else (new_id > self.id)
-                    if is_prev_closer:
+                    is_between_prev = (new_id < self.id) if dist_direct <= dist_warped else (new_id > self.id)
+                    if is_between_prev:
                         if msg.sender == self.prev: # Propagação quer voltar para prev (i.e. `key_id` está entre os dois nós)
                             s.connect(addr)
                             self.__send_move_in_message(s, self.prev, self.addr)
@@ -117,7 +117,7 @@ class Node:
                         else:
                             s.connect(self.prev)
                             self.__send_new_node_message(s, addr)
-                    else: # next está mais próximo
+                    else: # está entre next e o nó atual
                         if msg.sender == self.next: # Propagação quer voltar para next (i.e. `key_id` está entre os dois nós)
                             s.connect(addr)
                             self.__send_move_in_message(s, self.addr, self.next) # `new_id` está entre `self.id` e `next_id`
@@ -148,13 +148,13 @@ class Node:
                 key_id = get_chunk_id(key)
                 dist_direct, dist_warped = get_distances(key_id, self.id)
                 with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
-                    is_prev_closer = (new_id < self.id) if dist_direct <= dist_warped else (new_id > self.id)
-                    if is_prev_closer:
+                    is_between_prev = (new_id < self.id) if dist_direct <= dist_warped else (new_id > self.id)
+                    if is_between_prev:
                         if msg.sender == self.prev: # Propagação quer voltar para prev (i.e. `key_id` está entre os dois nós)
                             self.__respond_file_not_found(clSocket, msg)
                             return
                         s.connect(self.prev)
-                    else: # next está mais próximo
+                    else: # está entre next e o nó atual
                         if msg.sender == self.next: # Propagação quer voltar para next (i.e. `key_id` está entre os dois nós)
                             self.__respond_file_not_found(clSocket, msg)
                             return
