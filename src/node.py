@@ -3,7 +3,7 @@ import pickle as pk
 from message import Message, ChunkMessage
 import message
 import sys
-from filechunk import CHUNK_SIZE
+from filechunk import CHUNK_SIZE, convert_filename
 
 def get_node_id(addr: tuple[str, int]) -> int:
     ip1, ip2, ip3, ip4 = addr[0].split('.')
@@ -12,19 +12,7 @@ def get_node_id(addr: tuple[str, int]) -> int:
 
 def get_chunk_id(chunk: tuple[str, int]) -> int:
     filename, idx = chunk
-    chunk_conv = [0, 0, 0, 0, 0, 0, 0, 0, # Aceita apenas os primeiros 32 caracteres
-                  0, 0, 0, 0, 0, 0, 0, 0]
-    for i in range(len(chunk_conv)):
-        if i >= len(filename):
-            break
-        chunk_conv[i] = ord(filename[i])
-        if i+1 >= len(filename):
-            break
-        chunk_conv[i] |= ord(filename[i+1]) << 16
-    chunk_conv = (chunk_conv[0], chunk_conv[1], chunk_conv[2], chunk_conv[3],
-                  chunk_conv[4], chunk_conv[5], chunk_conv[6], chunk_conv[7],
-                  chunk_conv[8], chunk_conv[9], chunk_conv[10], chunk_conv[11],
-                  chunk_conv[12], chunk_conv[13], chunk_conv[14], chunk_conv[15], idx)
+    chunk_conv = (convert_filename(filename), idx)
     return hash(chunk_conv) % sys.maxsize
 
 def get_distances(target_id: int, current_id: int) -> tuple[int, int]:
@@ -196,7 +184,7 @@ class Node:
         elif msg.type == message.PUT_FILE:
             self.__respond_ok_message(clSocket)
             response_msg_data = b''
-            while True:
+            while True: # Recebe ChunkMessage em pedaços
                 suffix_data = clSocket.recv(4096)
                 if not suffix_data:
                     break

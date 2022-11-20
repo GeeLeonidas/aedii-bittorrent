@@ -13,6 +13,21 @@ def get_chunk(filename: str, idx: int):
         file.seek(CHUNK_SIZE * idx)
         return file.read(CHUNK_SIZE)
 
+def convert_filename(filename: str):
+    filename_conv = [0, 0, 0, 0, 0, 0, 0, 0, # Aceita apenas os primeiros 32 caracteres
+                  0, 0, 0, 0, 0, 0, 0, 0]
+    for i in range(len(filename_conv)):
+        if i >= len(filename):
+            break
+        filename_conv[i] = ord(filename[i])
+        if i+1 >= len(filename):
+            break
+        filename_conv[i] |= ord(filename[i+1]) << 16
+    return (filename_conv[0], filename_conv[1], filename_conv[2], filename_conv[3],
+            filename_conv[4], filename_conv[5], filename_conv[6], filename_conv[7],
+            filename_conv[8], filename_conv[9], filename_conv[10], filename_conv[11],
+            filename_conv[12], filename_conv[13], filename_conv[14], filename_conv[15])
+
 ## Adiciona todos os pedaços de um arquivo à DHT
 def add_file(filename: str , ip_list : list):
     # ip list é uma lista de tuplas (ip, porta)
