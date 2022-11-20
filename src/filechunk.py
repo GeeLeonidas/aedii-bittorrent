@@ -1,5 +1,6 @@
 import socket as skt
 import pickle as pk
+from message import Message
 import message
 import random
 
@@ -13,7 +14,6 @@ def get_chunk(filename: str, idx: int):
         return file.read(CHUNK_SIZE)
 
 ## Adiciona todos os pedaços de um arquivo à DHT
-## Retorna: Uma lista com os hashes dos pedaços
 def add_file(filename: str , ip_list : list):
     # ip list é uma lista de tuplas (ip, porta)
     idx = 0
@@ -21,17 +21,17 @@ def add_file(filename: str , ip_list : list):
     while chunk != b'':
 
         final = chunk == b''
-        msg : message = message.put_file_message(filename, idx, chunk, final)
+        msg: Message = message.put_file_message(filename, idx, chunk, final)
         
         # Select a random ip from the list
         ip = random.choice(ip_list)
         
         # Envia a mensagem para o ip selecionado
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
-            s.connect((ip[0], ip[1]))
+            s.connect(ip)
             s.sendall(pk.dumps(msg))
             response_msg_data = s.recv(1024)
-            response_msg: message = pk.loads(response_msg_data)
+            response_msg: Message = pk.loads(response_msg_data)
             assert response_msg.type == message.OK
 
         idx += 1

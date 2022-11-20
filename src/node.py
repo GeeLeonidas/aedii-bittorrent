@@ -4,15 +4,36 @@ from message import Message
 import message
 import sys
 
-def get_id(addr: tuple) -> int:
+def get_node_id(addr: tuple[str, int]) -> int:
     ip1, ip2, ip3, ip4 = addr[0].split('.')
     addr_conv = (int(ip1), int(ip2), int(ip3), int(ip4), addr[1])
     return hash(addr_conv) % sys.maxsize
 
+def get_chunk_id(chunk: tuple[str, int]) -> int:
+    filename, idx = chunk
+    chunk_conv = (0, 0, 0, 0, 0, 0, 0, 0, # Aceita apenas os primeiros 32 caracteres
+                  0, 0, 0, 0, 0, 0, 0, 0, idx)
+    for i in range(len(chunk_conv)-1):
+        if i >= len(filename):
+            break
+        chunk_conv[i] = ord(filename[i])
+        if i+1 >= len(filename):
+            break
+        chunk_conv[i] |= ord(filename[i+1]) << 16
+    return hash(chunk_conv) % sys.maxsize
+
+def get_distances(target_id: int, current_id: int) -> tuple[int, int]:
+    dist_direct = abs(target_id - current_id) # Distância sem passar pela origem
+    if target_id > current_id: # Distância passando pela origem
+        dist_warped = sys.maxsize - target_id + current_id # Sentido horário
+    else:
+        dist_warped = sys.maxsize + target_id - current_id # Sentido anti-horário
+    return dist_direct, dist_warped
+
 class Node:
     def __init__(self, addr: tuple):
         self.addr = addr
-        self.id = get_id(addr)
+        self.id = get_node_id(addr)
         self.prev = None
         self.next = None
         self.alive = True
@@ -31,6 +52,10 @@ class Node:
         s.sendall(pk.dumps(message.up_prev_message(prev, self.addr)))
     def __send_up_pair_message(self, s):
         s.sendall(pk.dumps(message.up_pair_message(self.addr)))
+    def __respond_file_found(self, s, current_msg: Message):
+        s.sendall(pk.dumps(message.file_found(current_msg, self.addr)))
+    def __respond_file_not_found(self, s, current_msg: Message):
+        s.sendall(pk.dumps(message.file_not_found(current_msg, self.addr)))
     
     def __echo(self, addr: tuple):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
@@ -50,6 +75,7 @@ class Node:
             response_msg: Message = pk.loads(response_msg_data)
             assert response_msg.type == message.OK
 
+    # TODO: Diminuir o número de casos específicos dos if's
     def __handle_message(self, msg: Message, clSocket):
         if msg.type == message.ECHO:
             ip, port = msg.content.split(':')
@@ -94,19 +120,13 @@ class Node:
                     response_msg: Message = pk.loads(response_msg_data)
                     assert response_msg.type == message.OK ## Útil para debug
             else: # Caso geral
-                new_id = get_id(addr)
+                new_id = get_node_id(addr)
                 if new_id == self.id:
                     self.__send_ok_message(clSocket)
                     return # TODO: Tratamento de colisões
-                
-                dist_direct = abs(new_id - self.id) # Distância sem passar pela origem
-                if new_id > self.id: # Distância passando pela origem
-                    dist_warped = sys.maxsize - new_id + self.id # Sentido horário
-                else:
-                    dist_warped = sys.maxsize + new_id - self.id # Sentido anti-horário
-
-                prev_id = get_id(self.prev)
-                next_id = get_id(self.next)
+                dist_direct, dist_warped = get_distances(new_id, self.id)
+                prev_id = get_node_id(self.prev)
+                next_id = get_node_id(self.next)
                 with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
                     if dist_direct <= dist_warped:
                         if new_id < self.id: # prev
@@ -150,17 +170,37 @@ class Node:
             key = (filename, int(index))
             if key in self.dict:
                 # responde o clSocket com o valor
-                with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
-                    response_msg: Message = message.get_file_response(self.dict[key], self.addr)
-                    clSocket.sendall(pk.dumps(response_msg))
+                self.__respond_file_found(clSocket, msg)
             else:
-                # repassa a mensagem para o próximo nó
+                key_id = get_chunk_id(key)
+                dist_direct, dist_warped = get_distances(key_id, self.id)
                 with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
-                    s.connect(self.next)
+                    if dist_direct <= dist_warped:
+                        if key_id < self.id: # prev
+                            if msg.sender == self.prev: # Propagação quer voltar para prev (i.e. `key_id` está entre os dois nós)
+                                self.__respond_file_not_found(clSocket, msg)
+                                return
+                            s.connect(self.prev)
+                        else: # next
+                            if msg.sender == self.next: # Propagação quer voltar para next (i.e. `key_id` está entre os dois nós)
+                                self.__respond_file_not_found(clSocket, msg)
+                                return
+                            s.connect(self.next)
+                    else:
+                        if key_id > self.id: # prev
+                            if msg.sender == self.prev: # Propagação quer voltar para prev (i.e. `key_id` está entre os dois nós)
+                                self.__respond_file_not_found(clSocket, msg)
+                                return
+                            s.connect(self.prev)
+                        else: # next
+                            if msg.sender == self.next: # Propagação quer voltar para next (i.e. `key_id` está entre os dois nós)
+                                self.__respond_file_not_found(clSocket, msg)
+                                return
+                            s.connect(self.next)
+                    # repassa a mensagem para o próximo nó
                     s.sendall(pk.dumps(msg))
                     response_msg_data = s.recv(1024)
-                    response_msg: Message = pk.loads(response_msg_data)
-                    clSocket.sendall(pk.dumps(response_msg))
+                    clSocket.sendall(response_msg_data)
             return
         
         self.__send_ok_message(clSocket)

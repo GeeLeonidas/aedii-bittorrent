@@ -7,7 +7,9 @@ UP_PREV     = b'\x04'
 UP_PAIR     = b'\x05' # Para quando a DHT possui apenas um par de nós
 ECHO        = b'\x06'
 GET_FILE    = b'\x07'
-PUT_FILE    = b'\x08'
+FILE_RESP   = b'\x08'
+NOT_FOUND   = b'\x09'
+PUT_FILE    = b'\x0A'
 
 class Message:
     def __init__(self, type: bytes, content: str, sender: tuple):
@@ -37,11 +39,16 @@ def up_pair_message(sender: tuple):
 def echo_message(addr: tuple, sender: tuple):
     return Message(ECHO, f'{addr[0]}:{addr[1]}', sender)
 
-def get_file_message(filename: str, idx: int):
-    return Message(GET_FILE, f'{filename}:{idx}', '')
+def get_file_message(filename: str, idx: int, sender: tuple):
+    return Message(GET_FILE, f'{filename}:{idx}', sender)
 
-def get_file_response(content: tuple, sender: tuple):
-    return Message(GET_FILE, content, sender) # content deve ter o formato (chunk, idx, final)
+def file_found(current_msg: Message, sender: tuple):
+    assert current_msg.type == GET_FILE
+    return Message(FILE_RESP, f'{sender[0]}:{sender[1]}', sender)
 
-def put_file_message(filename: str, idx: int, chunk: bytes, final: bool):
-    return Message(PUT_FILE, f'{filename}:{idx}:{chunk}:{final}', '')
+def file_not_found(current_msg: Message, sender: tuple):
+    assert current_msg.type == GET_FILE
+    return Message(NOT_FOUND, '', sender)
+
+def put_file_message(filename: str, idx: int, chunk: bytes, final: bool, sender: tuple):
+    return Message(PUT_FILE, f'{filename}:{idx}:{chunk}:{final}', sender)

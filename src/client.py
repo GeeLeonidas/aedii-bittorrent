@@ -25,7 +25,6 @@ class client:
                 msg: Message = pk.loads(data)
                 returned_messages.append(msg)
                 idx += 1
-                s.close()
                 if msg.content[2] == True:
                     break
 
