@@ -86,6 +86,9 @@ class Node:
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
             s.connect(self.addr)
             s.sendall(pk.dumps(message.find_file((filename, idx), self.addr)))
+            file_response = s.recv(1024)
+            msg: Message = pk.loads(file_response)
+            print(msg.type == message.FILE_FOUND)
 
     def enter_dht(self, known_node: tuple):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
@@ -167,31 +170,38 @@ class Node:
             else:
                 key_id = get_chunk_id(key)
                 dist_direct, dist_warped = get_distances(key_id, self.id)
+                is_between_prev = (key_id < self.id) if dist_direct <= dist_warped else (key_id > self.id)
+                if is_between_prev:
+                    if msg.sender == self.prev: # Propagação quer voltar para prev (i.e. `key_id` está entre os dois nós)
+                        self_dist, prev_dist, _ = self.__node_to_key(key_id)
+                        closest = self.addr if self_dist <= prev_dist else self.next
+                        self.__respond_file_not_found(clSocket, closest, msg)
+                        return
+                else: # está entre next e o nó atual
+                    if msg.sender == self.next: # Propagação quer voltar para next (i.e. `key_id` está entre os dois nós)
+                        self_dist, _, next_dist = self.__node_to_key(key_id)
+                        closest = self.addr if self_dist <= next_dist else self.next
+                        self.__respond_file_not_found(clSocket, closest, msg)
+                        return
+                msg.sender = self.addr
                 with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
-                    is_between_prev = (key_id < self.id) if dist_direct <= dist_warped else (key_id > self.id)
                     if is_between_prev:
-                        if msg.sender == self.prev: # Propagação quer voltar para prev (i.e. `key_id` está entre os dois nós)
-                            self_dist, prev_dist, _ = self.__node_to_key(key_id)
-                            closest = self.addr if self_dist <= prev_dist else self.next
-                            self.__respond_file_not_found(clSocket, closest, msg)
-                            return
                         s.connect(self.prev)
-                    else: # está entre next e o nó atual
-                        if msg.sender == self.next: # Propagação quer voltar para next (i.e. `key_id` está entre os dois nós)
-                            self_dist, _, next_dist = self.__node_to_key(key_id)
-                            closest = self.addr if self_dist <= next_dist else self.next
-                            self.__respond_file_not_found(clSocket, closest, msg)
-                            return
+                    else:
                         s.connect(self.next)
-                    msg.sender = self.addr
                     s.sendall(pk.dumps(msg))
                     response_msg_data = s.recv(1024)
                     clSocket.sendall(response_msg_data)
             return
         elif msg.type == message.PUT_FILE:
             self.__respond_ok_message(clSocket)
-            response_msg_data = clSocket.recv(CHUNK_SIZE + 256)
-            response_msg: ChunkMessage = pk.loads(response_msg)
+            response_msg_data = b''
+            while True:
+                suffix_data = clSocket.recv(4096)
+                if not suffix_data:
+                    break
+                response_msg_data += suffix_data
+            response_msg: ChunkMessage = pk.loads(response_msg_data)
             key_id = get_chunk_id(response_msg.key)
             self_dist, prev_dist, next_dist = self.__node_to_key(key_id)
             if self_dist <= prev_dist and self_dist <= next_dist:

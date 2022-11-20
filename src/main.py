@@ -1,7 +1,6 @@
 import threading as thr
 import node as nd
 import filechunk as fc
-import random
 
 BASE_PORT = 30000
 CMD_PREFIX = '>> '
@@ -22,14 +21,19 @@ if __name__ == "__main__":
     
     cmd = input(CMD_PREFIX)
     while cmd != 'exit':
+        args = cmd.split(' ')
+        cmd = args.pop(0)
         if cmd == 'echo':
             nodes[0].echo()
         elif cmd == 'print':
             for node in nodes:
                 print(f'{node.prev} (prev) - {node.addr} - {node.next} (next)')
         elif cmd == 'find':
-            song = random.choice(MUSIC)
-            nodes[0].find(song, 0)
+            song = MUSIC[int(args[0])]
+            nodes[0].find(song, int(args[1]))
+        elif cmd == 'put':
+            song = MUSIC[int(args[0])]
+            fc.add_file(song, [node.addr for node in nodes])
         cmd = input(CMD_PREFIX)
     for node in nodes:
         node.alive = False
