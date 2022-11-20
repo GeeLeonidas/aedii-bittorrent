@@ -16,7 +16,7 @@ class Node:
         self.prev = None
         self.next = None
         self.alive = True
-        self.dict = {}
+        self.dict = {} # Cada entrada deve ter o formato (chunk, idx : int, final : bool)
 
     # Atalhos para mandar mensagem a um nó
     def __send_ok_message(self, s):
@@ -162,6 +162,7 @@ class Node:
                     response_msg: Message = pk.loads(response_msg_data)
                     clSocket.sendall(pk.dumps(response_msg))
             return
+        
         self.__send_ok_message(clSocket)
                     
 

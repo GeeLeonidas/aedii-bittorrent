@@ -1,3 +1,8 @@
+import socket as skt
+import pickle as pk
+import message
+import random
+
 CHUNK_SIZE = 1 << 18 # 2^18 = 262144
 
 ## Pega um pedaço do arquivo, tamanho definido por `CHUNK_SIZE`
@@ -9,17 +14,32 @@ def get_chunk(filename: str, idx: int):
 
 ## Adiciona todos os pedaços de um arquivo à DHT
 ## Retorna: Uma lista com os hashes dos pedaços
-def add_file(filename: str) -> list:
-    res = []
+def add_file(filename: str , ip_list : list):
+    # ip list é uma lista de tuplas (ip, porta)
     idx = 0
     chunk = get_chunk(filename, 0)
-    while chunk != '':
-        chunk_hash = hash(chunk)
-        # TODO: Inserir o hash do pedaço à DHT (tratando colisões)
-        res.append(chunk_hash)
+    while chunk != b'':
+
+        final = chunk == b''
+        msg : message = message.put_file_message(filename, idx, chunk, final)
+        
+        # Select a random ip from the list
+        ip = random.choice(ip_list)
+        
+        # Envia a mensagem para o ip selecionado
+        with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
+            s.connect((ip[0], ip[1]))
+            s.sendall(pk.dumps(msg))
+            response_msg_data = s.recv(1024)
+            response_msg: Message = pk.loads(response_msg_data)
+            assert response_msg.type == message.OK
+
         idx += 1
         chunk = get_chunk(filename, idx)
-    return res
+        
+            
+
+
 
 ## Retorna uma lista com os hashes dos pedaços do arquivo
 def get_file(filename: str) -> list:
