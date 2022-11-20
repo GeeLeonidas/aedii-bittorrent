@@ -2,7 +2,7 @@ import threading as thr
 import node as nd
 import filechunk as fc
 
-BASE_PORT = 33300
+BASE_PORT = 30000
 CMD_PREFIX = '>> '
 MUSIC = ['SalmonLikeTheFish - Glacier.mp3', 'SalmonLikeTheFish - Shenandoah.mp3', 'SalmonLikeTheFish - Zion.mp3']
 
