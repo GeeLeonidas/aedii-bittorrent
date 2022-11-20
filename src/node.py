@@ -41,17 +41,17 @@ class Node:
 
     # Atalhos para mandar mensagem a um nó
     def __send_ok_message(self, s):
-        s.sendall(pk.dumps(message.ok_message(self.addr)))
+        s.sendall(pk.dumps(message.ok(self.addr)))
     def __send_new_node_message(self, s, addr: tuple):
-        s.sendall(pk.dumps(message.new_node_message(addr, self.addr)))
+        s.sendall(pk.dumps(message.new_node(addr, self.addr)))
     def __send_move_in_message(self, s, prev: tuple, next: tuple):
-        s.sendall(pk.dumps(message.move_in_message(prev, next, self.addr)))
+        s.sendall(pk.dumps(message.move_in(prev, next, self.addr)))
     def __send_up_pair_message(self, s):
-        s.sendall(pk.dumps(message.up_pair_message(self.addr)))
+        s.sendall(pk.dumps(message.up_pair(self.addr)))
     def __respond_up_next_message(self, s, next: tuple):
-        s.sendall(pk.dumps(message.up_next_message(next, self.addr)))
+        s.sendall(pk.dumps(message.up_next(next, self.addr)))
     def __respond_up_prev_message(self, s, prev: tuple):
-        s.sendall(pk.dumps(message.up_prev_message(prev, self.addr)))
+        s.sendall(pk.dumps(message.up_prev(prev, self.addr)))
     def __respond_file_found(self, s, current_msg: Message):
         s.sendall(pk.dumps(message.file_found(current_msg, self.addr)))
     def __respond_file_not_found(self, s, current_msg: Message):
@@ -60,7 +60,7 @@ class Node:
     def __echo(self, addr: tuple):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
             s.connect(self.next)
-            s.sendall(pk.dumps(message.echo_message(addr, self.addr)))
+            s.sendall(pk.dumps(message.echo(addr, self.addr)))
             response_msg_data = s.recv(1024)
             response_msg: Message = pk.loads(response_msg_data)
             assert response_msg.type == message.OK ## Útil para debug
