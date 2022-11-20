@@ -1,8 +1,11 @@
 import threading as thr
 import node as nd
+import filechunk as fc
+import random
 
 BASE_PORT = 30000
 CMD_PREFIX = '>> '
+MUSIC = ['music/SalmonLikeTheFish - Glacier.mp3', 'music/SalmonLikeTheFish - Shenandoah.mp3', 'music/SalmonLikeTheFish - Zion.mp3']
 
 if __name__ == "__main__":
     nodes = []
@@ -24,6 +27,9 @@ if __name__ == "__main__":
         elif cmd == 'print':
             for node in nodes:
                 print(f'{node.prev} (prev) - {node.addr} - {node.next} (next)')
+        elif cmd == 'find':
+            song = random.choice(MUSIC)
+            nodes[0].find(song, 0)
         cmd = input(CMD_PREFIX)
     for node in nodes:
         node.alive = False
