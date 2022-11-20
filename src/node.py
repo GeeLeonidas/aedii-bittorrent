@@ -46,12 +46,12 @@ class Node:
         s.sendall(pk.dumps(message.new_node_message(addr, self.addr)))
     def __send_move_in_message(self, s, prev: tuple, next: tuple):
         s.sendall(pk.dumps(message.move_in_message(prev, next, self.addr)))
-    def __send_up_next_message(self, s, next: tuple):
-        s.sendall(pk.dumps(message.up_next_message(next, self.addr)))
-    def __send_up_prev_message(self, s, prev: tuple):
-        s.sendall(pk.dumps(message.up_prev_message(prev, self.addr)))
     def __send_up_pair_message(self, s):
         s.sendall(pk.dumps(message.up_pair_message(self.addr)))
+    def __respond_up_next_message(self, s, next: tuple):
+        s.sendall(pk.dumps(message.up_next_message(next, self.addr)))
+    def __respond_up_prev_message(self, s, prev: tuple):
+        s.sendall(pk.dumps(message.up_prev_message(prev, self.addr)))
     def __respond_file_found(self, s, current_msg: Message):
         s.sendall(pk.dumps(message.file_found(current_msg, self.addr)))
     def __respond_file_not_found(self, s, current_msg: Message):
@@ -87,30 +87,11 @@ class Node:
             prev_ip, prev_port, next_ip, next_port = msg.content.split(':')
             self.prev = (prev_ip, int(prev_port))
             self.next = (next_ip, int(next_port))
-            with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
-                if msg.sender == self.next: # Foi o próximo nó que requisitou MOVE_IN
-                    s.connect(self.prev)
-                    self.__send_up_next_message(s, self.addr)
-                else: # Foi o nó anterior que requisitou MOVE_IN
-                    s.connect(self.next)
-                    self.__send_up_prev_message(s, self.addr)                
-                response_msg_data = s.recv(1024)
-                response_msg: Message = pk.loads(response_msg_data)
-                assert response_msg.type == message.OK
-        elif msg.type == message.UP_NEXT:
-            # substitui o nó sucessor atual pelo nó adicionado na rede
-            next_ip, next_port = msg.content.split(':')
-            self.next = (next_ip, int(next_port))
-        elif msg.type == message.UP_PREV:
-            # substitui o nó anterior atual pelo nó adicionado na rede
-            prev_ip, prev_port = msg.content.split(':')
-            self.prev = (prev_ip, int(prev_port))
         elif msg.type == message.UP_PAIR:
             self.prev = self.next = msg.sender
         elif msg.type == message.NEW_NODE:
             host, port = msg.content.split(':')
             addr = (host, int(port)) # Endereço do autor original da mensagem
-
             if self.prev == None: # `self` é a raíz da DHT
                 self.prev = self.next = addr
                 with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
@@ -125,46 +106,38 @@ class Node:
                     self.__send_ok_message(clSocket)
                     return # TODO: Tratamento de colisões
                 dist_direct, dist_warped = get_distances(new_id, self.id)
-                prev_id = get_node_id(self.prev)
-                next_id = get_node_id(self.next)
                 with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
-                    if dist_direct <= dist_warped:
-                        if new_id < self.id: # prev
-                            if new_id > prev_id or (new_id < prev_id and prev_id > self.id) or prev_id == next_id:
-                                s.connect(addr)
-                                self.__send_move_in_message(s, self.prev, self.addr) # `new_id` está entre `prev_id` e `self.id`
-                                self.prev = addr # Novo nó agora é predecessor do atual
-                            else:
-                                s.connect(self.prev)
-                                self.__send_new_node_message(s, addr)
-                        else: # next
-                            if new_id < next_id or (new_id > next_id and next_id < self.id) or prev_id == next_id:
-                                s.connect(addr)
-                                self.__send_move_in_message(s, self.addr, self.next) # `new_id` está entre `self.id` e `next_id`
-                                self.next = addr # Novo nó agora é sucessor do atual
-                            else: # Continue propagando a mensagem para frente
-                                s.connect(self.next)
-                                self.__send_new_node_message(s, addr)                      
-                    else:
-                        if new_id > self.id: # prev
-                            if new_id > prev_id or prev_id == next_id: # `new_id` está entre `prev_id` e `self.id`
-                                s.connect(addr)
-                                self.__send_move_in_message(s, self.prev, self.addr)
-                                self.prev = addr # Novo nó agora é predecessor do atual
-                            else: # Propaga para trás até passar da origem
-                                s.connect(self.prev)
-                                self.__send_new_node_message(s, addr)
-                        else: # next
-                            if new_id < next_id or prev_id == next_id: # `new_id` está entre `self.id` e `prev_id`
-                                s.connect(addr)
-                                self.__send_move_in_message(s, self.addr, self.next)
-                                self.next = addr # Novo nó agora é sucessor do atual
-                            else: # Propaga para frente até passar da origem
-                                s.connect(self.next)
-                                self.__send_new_node_message(s, addr)
+                    is_prev_closer = (new_id < self.id) if dist_direct <= dist_warped else (new_id > self.id)
+                    if is_prev_closer:
+                        if msg.sender == self.prev: # Propagação quer voltar para prev (i.e. `key_id` está entre os dois nós)
+                            s.connect(addr)
+                            self.__send_move_in_message(s, self.prev, self.addr)
+                            self.prev = addr # Novo nó agora é predecessor do atual
+                            self.__respond_up_next_message(clSocket, addr)
+                        else:
+                            s.connect(self.prev)
+                            self.__send_new_node_message(s, addr)
+                    else: # next está mais próximo
+                        if msg.sender == self.next: # Propagação quer voltar para next (i.e. `key_id` está entre os dois nós)
+                            s.connect(addr)
+                            self.__send_move_in_message(s, self.addr, self.next) # `new_id` está entre `self.id` e `next_id`
+                            self.next = addr # Novo nó agora é sucessor do atual
+                            self.__respond_up_prev_message(clSocket, addr)
+                        else: # Continue propagando a mensagem para frente
+                            s.connect(self.next)
+                            self.__send_new_node_message(s, addr)
                     response_msg_data = s.recv(1024)
                     response_msg: Message = pk.loads(response_msg_data)
-                    assert response_msg.type == message.OK ## Útil para debug
+                    if response_msg.type == message.UP_NEXT:
+                        # substitui o nó sucessor atual pelo nó adicionado na rede
+                        next_ip, next_port = response_msg.content.split(':')
+                        self.next = (next_ip, int(next_port))
+                    elif response_msg.type == message.UP_PREV:
+                        # substitui o nó anterior atual pelo nó adicionado na rede
+                        prev_ip, prev_port = response_msg.content.split(':')
+                        self.prev = (prev_ip, int(prev_port))
+                    else:
+                        assert response_msg.type == message.OK ## Útil para debug
         elif msg.type == message.GET_FILE:
             filename, index = msg.content.split(':')
             key = (filename, int(index))
@@ -175,28 +148,17 @@ class Node:
                 key_id = get_chunk_id(key)
                 dist_direct, dist_warped = get_distances(key_id, self.id)
                 with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
-                    if dist_direct <= dist_warped:
-                        if key_id < self.id: # prev
-                            if msg.sender == self.prev: # Propagação quer voltar para prev (i.e. `key_id` está entre os dois nós)
-                                self.__respond_file_not_found(clSocket, msg)
-                                return
-                            s.connect(self.prev)
-                        else: # next
-                            if msg.sender == self.next: # Propagação quer voltar para next (i.e. `key_id` está entre os dois nós)
-                                self.__respond_file_not_found(clSocket, msg)
-                                return
-                            s.connect(self.next)
-                    else:
-                        if key_id > self.id: # prev
-                            if msg.sender == self.prev: # Propagação quer voltar para prev (i.e. `key_id` está entre os dois nós)
-                                self.__respond_file_not_found(clSocket, msg)
-                                return
-                            s.connect(self.prev)
-                        else: # next
-                            if msg.sender == self.next: # Propagação quer voltar para next (i.e. `key_id` está entre os dois nós)
-                                self.__respond_file_not_found(clSocket, msg)
-                                return
-                            s.connect(self.next)
+                    is_prev_closer = (new_id < self.id) if dist_direct <= dist_warped else (new_id > self.id)
+                    if is_prev_closer:
+                        if msg.sender == self.prev: # Propagação quer voltar para prev (i.e. `key_id` está entre os dois nós)
+                            self.__respond_file_not_found(clSocket, msg)
+                            return
+                        s.connect(self.prev)
+                    else: # next está mais próximo
+                        if msg.sender == self.next: # Propagação quer voltar para next (i.e. `key_id` está entre os dois nós)
+                            self.__respond_file_not_found(clSocket, msg)
+                            return
+                        s.connect(self.next)
                     # repassa a mensagem para o próximo nó
                     s.sendall(pk.dumps(msg))
                     response_msg_data = s.recv(1024)
