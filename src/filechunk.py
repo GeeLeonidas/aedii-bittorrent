@@ -31,7 +31,7 @@ def add_file(filename: str , ip_list : list):
             s.connect((ip[0], ip[1]))
             s.sendall(pk.dumps(msg))
             response_msg_data = s.recv(1024)
-            response_msg: Message = pk.loads(response_msg_data)
+            response_msg: message = pk.loads(response_msg_data)
             assert response_msg.type == message.OK
 
         idx += 1
