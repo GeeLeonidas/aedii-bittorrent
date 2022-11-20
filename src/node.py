@@ -165,7 +165,7 @@ class Node:
                         closest = self.addr if self_dist <= prev_dist else self.next
                         self.__respond_file_not_found(clSocket, closest, msg)
                         return
-                else: # está entre next e o nó atual
+                else:
                     if msg.sender == self.next: # Propagação quer voltar para next (i.e. `key_id` está entre os dois nós)
                         self_dist, _, next_dist = self.__node_to_key(key_id)
                         closest = self.addr if self_dist <= next_dist else self.next
@@ -174,12 +174,12 @@ class Node:
                 msg.sender = self.addr
                 with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
                     if is_between_prev:
-                        s.connect(self.prev)
+                        s.connect(self.prev) # Propague para trás
                     else:
-                        s.connect(self.next)
+                        s.connect(self.next) # Propague para frente
                     s.sendall(pk.dumps(msg))
                     response_msg_data = s.recv(1024)
-                    clSocket.sendall(response_msg_data)
+                    clSocket.sendall(response_msg_data) # Repasse a resposta recebida
             return
         elif msg.type == message.PUT_FILE:
             self.__respond_ok_message(clSocket)
