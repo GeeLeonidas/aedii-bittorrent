@@ -15,7 +15,7 @@ def get_chunk(filename: str, idx: int):
 
 def convert_filename(filename: str):
     filename_conv = [0, 0, 0, 0, 0, 0, 0, 0, # Aceita apenas os primeiros 32 caracteres
-                  0, 0, 0, 0, 0, 0, 0, 0]
+                     0, 0, 0, 0, 0, 0, 0, 0]
     for i in range(len(filename_conv)):
         if i >= len(filename):
             break
