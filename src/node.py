@@ -195,6 +195,13 @@ class Node:
             if self_dist <= prev_dist and self_dist <= next_dist:
                 self.dict[response_msg.key] = response_msg.raw
             return
+        elif msg.type == message.GET_FILE:
+            key = msg.content
+            chunk = self.dict[key]
+            response_msg: Message = message.get_file(self.addr, chunk)
+            clSocket.sendall(pk.dumps(response_msg))
+
+            return
         
         self.__respond_ok_message(clSocket)
                     
