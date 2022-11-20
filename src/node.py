@@ -1,8 +1,9 @@
 import socket as skt
 import pickle as pk
-from message import Message
+from message import Message, ChunkMessage
 import message
 import sys
+from filechunk import CHUNK_SIZE
 
 def get_node_id(addr: tuple[str, int]) -> int:
     ip1, ip2, ip3, ip4 = addr[0].split('.')
@@ -39,8 +40,19 @@ class Node:
         self.alive = True
         self.dict = {} # Cada entrada deve ter o formato (chunk, idx : int, final : bool)
 
+    def __node_to_key(self, key_id: int) -> tuple[int, int, int]:
+        prev_id = get_node_id(self.prev)
+        next_id = get_node_id(self.next)
+        dist_direct, dist_warped = get_distances(key_id, self.id)
+        self_dist = min(dist_direct, dist_warped)
+        dist_direct, dist_warped = get_distances(key_id, prev_id)
+        prev_dist = min(dist_direct, dist_warped)
+        dist_direct, dist_warped = get_distances(key_id, next_id)
+        next_dist = min(dist_direct, dist_warped)
+        return self_dist, prev_dist, next_dist
+
     # Atalhos para mandar mensagem a um nó
-    def __send_ok_message(self, s):
+    def __respond_ok_message(self, s):
         s.sendall(pk.dumps(message.ok(self.addr)))
     def __send_new_node_message(self, s, addr: tuple):
         s.sendall(pk.dumps(message.new_node(addr, self.addr)))
@@ -103,7 +115,7 @@ class Node:
             else: # Caso geral
                 new_id = get_node_id(addr)
                 if new_id == self.id:
-                    self.__send_ok_message(clSocket)
+                    self.__respond_ok_message(clSocket)
                     return # TODO: Tratamento de colisões
                 dist_direct, dist_warped = get_distances(new_id, self.id)
                 with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
@@ -138,10 +150,10 @@ class Node:
                         self.prev = (prev_ip, int(prev_port))
                     else:
                         assert response_msg.type == message.OK ## Útil para debug
-        elif msg.type == message.GET_FILE:
+        elif msg.type == message.FIND_FILE:
             filename, index = msg.content.split(':')
             key = (filename, int(index))
-            if key in self.dict:
+            if key in self.dict.keys:
                 # responde o clSocket com o valor
                 self.__respond_file_found(clSocket, msg)
             else:
@@ -151,21 +163,33 @@ class Node:
                     is_between_prev = (new_id < self.id) if dist_direct <= dist_warped else (new_id > self.id)
                     if is_between_prev:
                         if msg.sender == self.prev: # Propagação quer voltar para prev (i.e. `key_id` está entre os dois nós)
-                            self.__respond_file_not_found(clSocket, msg)
+                            self_dist, prev_dist, _ = self.__node_to_key(key_id)
+                            closest = self.addr if self_dist <= next_dist else self.next
+                            self.__respond_file_not_found(clSocket, closest, msg)
                             return
                         s.connect(self.prev)
                     else: # está entre next e o nó atual
                         if msg.sender == self.next: # Propagação quer voltar para next (i.e. `key_id` está entre os dois nós)
-                            self.__respond_file_not_found(clSocket, msg)
+                            self_dist, _, next_dist = self.__node_to_key(key_id)
+                            closest = self.addr if self_dist <= next_dist else self.next
+                            self.__respond_file_not_found(clSocket, closest, msg)
                             return
                         s.connect(self.next)
-                    # repassa a mensagem para o próximo nó
                     s.sendall(pk.dumps(msg))
                     response_msg_data = s.recv(1024)
                     clSocket.sendall(response_msg_data)
             return
+        elif msg.type == message.PUT_FILE:
+            self.__respond_ok_message(clSocket)
+            response_msg_data = clSocket.recv(CHUNK_SIZE + 256)
+            response_msg: ChunkMessage = pk.loads(response_msg)
+            key_id = get_chunk_id(response_msg.key)
+            self_dist, prev_dist, next_dist = self.__node_to_key(key_id)
+            if self_dist <= prev_dist and self_dist <= next_dist:
+                self.dict[response_msg.key] = response_msg.raw
+            return
         
-        self.__send_ok_message(clSocket)
+        self.__respond_ok_message(clSocket)
                     
 
     def listen(self):
@@ -184,5 +208,5 @@ class Node:
                         if not msg_data: # Finalizou a conexão
                             break
                         msg: Message = pk.loads(msg_data)
-                        print(f'{msg.sender} enviou mensagem para {self.addr}')
+                        print(f'{msg.sender} enviou {len(msg_data)} bytes para {self.addr}')
                         self.__handle_message(msg, conn)
