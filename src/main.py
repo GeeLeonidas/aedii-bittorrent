@@ -2,9 +2,9 @@ import threading as thr
 import node as nd
 import filechunk as fc
 
-BASE_PORT = 30000
+BASE_PORT = 33300
 CMD_PREFIX = '>> '
-MUSIC = ['music/SalmonLikeTheFish - Glacier.mp3', 'music/SalmonLikeTheFish - Shenandoah.mp3', 'music/SalmonLikeTheFish - Zion.mp3']
+MUSIC = ['SalmonLikeTheFish - Glacier.mp3', 'SalmonLikeTheFish - Shenandoah.mp3', 'SalmonLikeTheFish - Zion.mp3']
 
 if __name__ == "__main__":
     nodes = []
@@ -28,12 +28,15 @@ if __name__ == "__main__":
         elif cmd == 'print':
             for node in nodes:
                 print(f'{node.prev} (prev) - {node.addr} - {node.next} (next)')
-        elif cmd == 'find':
+        elif cmd == 'find' and len(args) == 2:
             song = MUSIC[int(args[0])]
             nodes[0].find(song, int(args[1]))
-        elif cmd == 'put':
+        elif cmd == 'put' and len(args) == 1:
             song = MUSIC[int(args[0])]
-            fc.add_file(song, [node.addr for node in nodes])
+            fc.add_file('music', song, [node.addr for node in nodes])
+        elif cmd == 'get' and len(args) == 2:
+            song = MUSIC[int(args[0])]
+            fc.get_file(args[1], song, [node.addr for node in nodes])
         cmd = input(CMD_PREFIX)
     for node in nodes:
         node.alive = False

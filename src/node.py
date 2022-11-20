@@ -5,15 +5,18 @@ import message
 import sys
 from filechunk import CHUNK_SIZE, convert_filename
 
+
 def get_node_id(addr: tuple[str, int]) -> int:
     ip1, ip2, ip3, ip4 = addr[0].split('.')
     addr_conv = (int(ip1), int(ip2), int(ip3), int(ip4), addr[1])
     return hash(addr_conv) % sys.maxsize
 
+
 def get_chunk_id(chunk: tuple[str, int]) -> int:
     filename, idx = chunk
     chunk_conv = (convert_filename(filename), idx)
     return hash(chunk_conv) % sys.maxsize
+
 
 def get_distances(target_id: int, current_id: int) -> tuple[int, int]:
     dist_direct = abs(target_id - current_id) # Distância sem passar pela origem
@@ -30,7 +33,8 @@ class Node:
         self.prev = None
         self.next = None
         self.alive = True
-        self.dict = {} # Cada entrada deve ter o formato (chunk, idx : int, final : bool)
+        self.dict = {} # Cada entrada deve ter o formato (filename : str, idx : int)
+
 
     def __node_to_key(self, key_id: int) -> tuple[int, int, int]:
         prev_id = get_node_id(self.prev)
@@ -42,6 +46,7 @@ class Node:
         dist_direct, dist_warped = get_distances(key_id, next_id)
         next_dist = min(dist_direct, dist_warped)
         return self_dist, prev_dist, next_dist
+
 
     # Atalhos para mandar mensagem a um nó
     def __respond_ok_message(self, s):
@@ -60,16 +65,22 @@ class Node:
         s.sendall(pk.dumps(message.file_found(current_msg, self.addr)))
     def __respond_file_not_found(self, s, closest: tuple[str, int], current_msg: Message):
         s.sendall(pk.dumps(message.file_not_found(current_msg, closest, self.addr)))
-    
+
+
     def __echo(self, addr: tuple):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
-            s.connect(self.next)
+            if self.next == None:
+                s.connect(self.addr)
+            else:
+                s.connect(self.next)
             s.sendall(pk.dumps(message.echo(addr, self.addr)))
             response_msg_data = s.recv(1024)
             response_msg: Message = pk.loads(response_msg_data)
             assert response_msg.type == message.OK ## Útil para debug
     def echo(self):
         self.__echo(self.addr)
+    
+    
     def find(self, filename: str, idx: int):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
             s.connect(self.addr)
@@ -78,6 +89,7 @@ class Node:
             msg: Message = pk.loads(file_response)
             print(msg.type == message.FILE_FOUND)
 
+
     def enter_dht(self, known_node: tuple):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
             s.connect(known_node)
@@ -85,6 +97,7 @@ class Node:
             response_msg_data = s.recv(1024)
             response_msg: Message = pk.loads(response_msg_data)
             assert response_msg.type == message.OK
+
 
     # TODO: Diminuir o número de casos específicos dos if's
     def __handle_message(self, msg: Message, clSocket):
@@ -152,17 +165,20 @@ class Node:
         elif msg.type == message.FIND_FILE:
             filename, index = msg.content.split(':')
             key = (filename, int(index))
-            if key in self.dict.keys():
+            if key in self.dict:
                 # responde o clSocket com o valor
                 self.__respond_file_found(clSocket, msg)
             else:
+                if self.prev == None: # Apenas um nó na rede
+                    self.__respond_file_not_found(clSocket, self.addr, msg)
+                    return
                 key_id = get_chunk_id(key)
                 dist_direct, dist_warped = get_distances(key_id, self.id)
                 is_between_prev = (key_id < self.id) if dist_direct <= dist_warped else (key_id > self.id)
                 if is_between_prev:
                     if msg.sender == self.prev: # Propagação quer voltar para prev (i.e. `key_id` está entre os dois nós)
                         self_dist, prev_dist, _ = self.__node_to_key(key_id)
-                        closest = self.addr if self_dist <= prev_dist else self.next
+                        closest = self.addr if self_dist <= prev_dist else self.prev
                         self.__respond_file_not_found(clSocket, closest, msg)
                         return
                 else:
@@ -191,20 +207,21 @@ class Node:
                 response_msg_data += suffix_data
             response_msg: ChunkMessage = pk.loads(response_msg_data)
             key_id = get_chunk_id(response_msg.key)
-            self_dist, prev_dist, next_dist = self.__node_to_key(key_id)
-            if self_dist <= prev_dist and self_dist <= next_dist:
-                self.dict[response_msg.key] = response_msg.raw
+            if self.prev != None:
+                self_dist, prev_dist, next_dist = self.__node_to_key(key_id)
+                if self_dist > prev_dist or self_dist > next_dist: # Checagem extra pra saber se é o melhor nó
+                    return
+            self.dict[response_msg.key] = response_msg.raw
             return
         elif msg.type == message.GET_FILE:
-            key = msg.content
+            filename, idx = msg.content.split(':')
+            key = (filename, int(idx))
             chunk = self.dict[key]
-            response_msg: Message = message.get_file(self.addr, chunk)
+            response_msg = ChunkMessage(key, chunk)
             clSocket.sendall(pk.dumps(response_msg))
-
             return
-        
         self.__respond_ok_message(clSocket)
-                    
+  
 
     def listen(self):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:

@@ -59,5 +59,5 @@ def file_not_found(current_msg: Message, closest: tuple[str, int], sender: tuple
 def put_file(sender: tuple[str, int]):
     return Message(PUT_FILE, '', sender)
 
-def get_file(sender: tuple[str, int], key): # key = (filename, idx)
+def get_file(key: tuple[str, int], sender: tuple[str, int]): # key = (filename, idx)
     return Message(GET_FILE, f'{key[0]}:{key[1]}', sender)
