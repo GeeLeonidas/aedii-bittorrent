@@ -13,7 +13,7 @@ if __name__ == "__main__":
     threads = []
     node_count = int(input('Node count: '))
     for i in range(node_count):
-        nodes.append(nd.Node(('127.0.0.1', 0)))
+        nodes.append(nd.Node(('127.0.0.1', BASE_PORT+i)))
         threads.append(thr.Thread(target=nodes[i].listen))
     for i in range(node_count):
         threads[i].start()
