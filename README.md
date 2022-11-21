@@ -2,6 +2,10 @@
 - Caso seja executada no Windows, o limite da rede artificial é de 2 nós (pois o sistema impede a abertura de portas adicionais).
 - Caso utilize-se de uma porta aleatória para o nó (inserindo 0 como valor), a rede pode apresentar comportamento imprevisível, pois recebe pacotes indesejados que rompem com a lógica da implementação.
 
+## Sistema utilizado
+- Python 3.10.8
+- Linux (kernel 6.0.8-1-default)
+
 ## Como usar
 - Executando `python src/main.py` para obter um terminal interativo:
   - Comando `echo`: Uma mensagem percorre toda a DHT e volta ao nó original.
