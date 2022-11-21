@@ -3,7 +3,7 @@ import pickle as pk
 from message import Message, ChunkMessage
 import message
 import sys
-from filechunk import CHUNK_SIZE, convert_filename
+from filechunk import convert_filename
 
 
 def get_node_id(addr: tuple[str, int]) -> int:
@@ -19,12 +19,13 @@ def get_chunk_id(chunk: tuple[str, int]) -> int:
 
 
 def get_distances(target_id: int, current_id: int) -> tuple[int, int]:
-    dist_direct = abs(target_id - current_id) # Distância sem passar pela origem
-    if target_id > current_id: # Distância passando pela origem
-        dist_warped = sys.maxsize - target_id + current_id # Sentido horário
+    dist_direct = abs(target_id - current_id)  # Distância sem passar pela origem
+    if target_id > current_id:  # Distância passando pela origem
+        dist_warped = sys.maxsize - target_id + current_id  # Sentido horário
     else:
-        dist_warped = sys.maxsize + target_id - current_id # Sentido anti-horário
+        dist_warped = sys.maxsize + target_id - current_id  # Sentido anti-horário
     return dist_direct, dist_warped
+
 
 class Node:
     def __init__(self, addr: tuple):
@@ -33,8 +34,7 @@ class Node:
         self.prev = None
         self.next = None
         self.alive = True
-        self.dict = {} # Cada entrada deve ter o formato (filename : str, idx : int)
-
+        self.dict = {}  # Cada entrada deve ter o formato (filename : str, idx : int)
 
     def __node_to_key(self, key_id: int) -> tuple[int, int, int]:
         prev_id = get_node_id(self.prev)
@@ -47,40 +47,45 @@ class Node:
         next_dist = min(dist_direct, dist_warped)
         return self_dist, prev_dist, next_dist
 
-
     # Atalhos para mandar mensagem a um nó
     def __respond_ok_message(self, s):
         s.sendall(pk.dumps(message.ok(self.addr)))
+
     def __send_new_node_message(self, s, addr: tuple):
         s.sendall(pk.dumps(message.new_node(addr, self.addr)))
+
     def __send_move_in_message(self, s, prev: tuple, next: tuple):
         s.sendall(pk.dumps(message.move_in(prev, next, self.addr)))
+
     def __send_up_pair_message(self, s):
         s.sendall(pk.dumps(message.up_pair(self.addr)))
+
     def __respond_up_next_message(self, s, next: tuple):
         s.sendall(pk.dumps(message.up_next(next, self.addr)))
+
     def __respond_up_prev_message(self, s, prev: tuple):
         s.sendall(pk.dumps(message.up_prev(prev, self.addr)))
+
     def __respond_file_found(self, s, current_msg: Message):
         s.sendall(pk.dumps(message.file_found(current_msg, self.addr)))
+
     def __respond_file_not_found(self, s, closest: tuple[str, int], current_msg: Message):
         s.sendall(pk.dumps(message.file_not_found(current_msg, closest, self.addr)))
 
-
     def __echo(self, addr: tuple):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
-            if self.next == None:
+            if self.next is None:
                 s.connect(self.addr)
             else:
                 s.connect(self.next)
             s.sendall(pk.dumps(message.echo(addr, self.addr)))
             response_msg_data = s.recv(1024)
             response_msg: Message = pk.loads(response_msg_data)
-            assert response_msg.type == message.OK ## Útil para debug
+            assert response_msg.type == message.OK  # Útil para debug
+
     def echo(self):
         self.__echo(self.addr)
-    
-    
+
     def find(self, filename: str, idx: int):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
             s.connect(self.addr)
@@ -88,7 +93,6 @@ class Node:
             file_response = s.recv(1024)
             msg: Message = pk.loads(file_response)
             print(msg.type == message.FILE_FOUND)
-
 
     def enter_dht(self, known_node: tuple):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
@@ -98,15 +102,14 @@ class Node:
             response_msg: Message = pk.loads(response_msg_data)
             assert response_msg.type == message.OK
 
-
     # TODO: Diminuir o número de casos específicos dos if's
-    def __handle_message(self, msg: Message, clSocket):
+    def __handle_message(self, msg: Message, cl_socket):
         if msg.type == message.ECHO:
             ip, port = msg.content.split(':')
             addr = (ip, int(port))
-            if self.addr != addr: # Se o endereço atual for o mesmo do original, a mensagem propagou pela rede toda
+            if self.addr != addr:  # Se o endereço atual for o mesmo do original, a mensagem propagou pela rede toda
                 self.__echo(addr)
-        
+
         elif msg.type == message.MOVE_IN:
             prev_ip, prev_port, next_ip, next_port = msg.content.split(':')
             self.prev = (prev_ip, int(prev_port))
@@ -115,39 +118,40 @@ class Node:
             self.prev = self.next = msg.sender
         elif msg.type == message.NEW_NODE:
             host, port = msg.content.split(':')
-            addr = (host, int(port)) # Endereço do autor original da mensagem
-            if self.prev == None: # `self` é a raíz da DHT
+            addr = (host, int(port))  # Endereço do autor original da mensagem
+            if self.prev is None:  # `self` é a raíz da DHT
                 self.prev = self.next = addr
                 with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
-                    s.connect(addr) # Dizer para o novo nó como se atualizar
+                    s.connect(addr)  # Dizer para o novo nó como se atualizar
                     self.__send_up_pair_message(s)
                     response_msg_data = s.recv(1024)
                     response_msg: Message = pk.loads(response_msg_data)
-                    assert response_msg.type == message.OK ## Útil para debug
-            else: # Caso geral
+                    assert response_msg.type == message.OK  # Útil para debug
+            else:  # Caso geral
                 new_id = get_node_id(addr)
                 if new_id == self.id:
-                    self.__respond_ok_message(clSocket)
-                    return # TODO: Tratamento de colisões
+                    self.__respond_ok_message(cl_socket)
+                    return  # TODO: Tratamento de colisões
                 dist_direct, dist_warped = get_distances(new_id, self.id)
                 with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
                     is_between_prev = (new_id < self.id) if dist_direct <= dist_warped else (new_id > self.id)
                     if is_between_prev:
-                        if msg.sender == self.prev: # Propagação quer voltar para prev (i.e. `key_id` está entre os dois nós)
+                        if msg.sender == self.prev:  # Propagação quer voltar para prev (i.e. ''key_id'' está entre os dois nós)
                             s.connect(addr)
                             self.__send_move_in_message(s, self.prev, self.addr)
-                            self.prev = addr # Novo nó agora é predecessor do atual
-                            self.__respond_up_next_message(clSocket, addr)
+                            self.prev = addr  # Novo nó agora é predecessor do atual
+                            self.__respond_up_next_message(cl_socket, addr)
                         else:
                             s.connect(self.prev)
                             self.__send_new_node_message(s, addr)
-                    else: # está entre next e o nó atual
-                        if msg.sender == self.next: # Propagação quer voltar para next (i.e. `key_id` está entre os dois nós)
+                    else:  # está entre next e o nó atual
+                        if msg.sender == self.next:  # Propagação quer voltar para next (i.e. ''key_id'' está entre os dois nós)
                             s.connect(addr)
-                            self.__send_move_in_message(s, self.addr, self.next) # `new_id` está entre `self.id` e `next_id`
-                            self.next = addr # Novo nó agora é sucessor do atual
-                            self.__respond_up_prev_message(clSocket, addr)
-                        else: # Continue propagando a mensagem para frente
+                            self.__send_move_in_message(s, self.addr,
+                                                        self.next)  # `new_id` está entre `self.id` e `next_id`
+                            self.next = addr  # Novo nó agora é sucessor do atual
+                            self.__respond_up_prev_message(cl_socket, addr)
+                        else:  # Continue propagando a mensagem para frente
                             s.connect(self.next)
                             self.__send_new_node_message(s, addr)
                     response_msg_data = s.recv(1024)
@@ -161,55 +165,55 @@ class Node:
                         prev_ip, prev_port = response_msg.content.split(':')
                         self.prev = (prev_ip, int(prev_port))
                     else:
-                        assert response_msg.type == message.OK ## Útil para debug
+                        assert response_msg.type == message.OK  # Útil para debug
         elif msg.type == message.FIND_FILE:
             filename, index = msg.content.split(':')
             key = (filename, int(index))
             if key in self.dict:
                 # responde o clSocket com o valor
-                self.__respond_file_found(clSocket, msg)
+                self.__respond_file_found(cl_socket, msg)
             else:
-                if self.prev == None: # Apenas um nó na rede
-                    self.__respond_file_not_found(clSocket, self.addr, msg)
+                if self.prev is None:  # Apenas um nó na rede
+                    self.__respond_file_not_found(cl_socket, self.addr, msg)
                     return
                 key_id = get_chunk_id(key)
                 dist_direct, dist_warped = get_distances(key_id, self.id)
                 is_between_prev = (key_id < self.id) if dist_direct <= dist_warped else (key_id > self.id)
                 if is_between_prev:
-                    if msg.sender == self.prev: # Propagação quer voltar para prev (i.e. `key_id` está entre os dois nós)
+                    if msg.sender == self.prev:  # Propagação quer voltar para prev (i.e. ''key_id'' está entre os dois nós)
                         self_dist, prev_dist, _ = self.__node_to_key(key_id)
                         closest = self.addr if self_dist <= prev_dist else self.prev
-                        self.__respond_file_not_found(clSocket, closest, msg)
+                        self.__respond_file_not_found(cl_socket, closest, msg)
                         return
                 else:
-                    if msg.sender == self.next: # Propagação quer voltar para next (i.e. `key_id` está entre os dois nós)
+                    if msg.sender == self.next:  # Propagação quer voltar para next (i.e. ''key_id'' está entre os dois nós)
                         self_dist, _, next_dist = self.__node_to_key(key_id)
                         closest = self.addr if self_dist <= next_dist else self.next
-                        self.__respond_file_not_found(clSocket, closest, msg)
+                        self.__respond_file_not_found(cl_socket, closest, msg)
                         return
                 msg.sender = self.addr
                 with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
                     if is_between_prev:
-                        s.connect(self.prev) # Propague para trás
+                        s.connect(self.prev)  # Propague para trás
                     else:
-                        s.connect(self.next) # Propague para frente
+                        s.connect(self.next)  # Propague para frente
                     s.sendall(pk.dumps(msg))
                     response_msg_data = s.recv(1024)
-                    clSocket.sendall(response_msg_data) # Repasse a resposta recebida
+                    cl_socket.sendall(response_msg_data)  # Repasse a resposta recebida
             return
         elif msg.type == message.PUT_FILE:
-            self.__respond_ok_message(clSocket)
+            self.__respond_ok_message(cl_socket)
             response_msg_data = b''
-            while True: # Recebe ChunkMessage em pedaços
-                suffix_data = clSocket.recv(4096)
+            while True:  # Recebe ChunkMessage em pedaços
+                suffix_data = cl_socket.recv(4096)
                 if not suffix_data:
                     break
                 response_msg_data += suffix_data
             response_msg: ChunkMessage = pk.loads(response_msg_data)
             key_id = get_chunk_id(response_msg.key)
-            if self.prev != None:
+            if self.prev is not None:
                 self_dist, prev_dist, next_dist = self.__node_to_key(key_id)
-                if self_dist > prev_dist or self_dist > next_dist: # Checagem extra pra saber se é o melhor nó
+                if self_dist > prev_dist or self_dist > next_dist:  # Checagem extra para saber se é o melhor nó
                     return
             self.dict[response_msg.key] = response_msg.raw
             return
@@ -218,16 +222,15 @@ class Node:
             key = (filename, int(idx))
             chunk = self.dict[key]
             response_msg = ChunkMessage(key, chunk)
-            clSocket.sendall(pk.dumps(response_msg))
+            cl_socket.sendall(pk.dumps(response_msg))
             return
-        self.__respond_ok_message(clSocket)
-  
+        self.__respond_ok_message(cl_socket)
 
     def listen(self):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
             s.bind(self.addr)
             s.listen()
-            s.settimeout(1) # Adiciona um delay (em seg.) para ele verificar se `self.alive` é verdadeiro
+            s.settimeout(1)  # Adiciona um delay (em seg.) para ele verificar se 'self.alive' é verdadeiro
             while self.alive:
                 try:
                     conn, conn_addr = s.accept()
@@ -236,7 +239,7 @@ class Node:
                 with conn:
                     while True:
                         msg_data = conn.recv(1024)
-                        if not msg_data: # Finalizou a conexão
+                        if not msg_data:  # Finalizou a conexão
                             break
                         msg: Message = pk.loads(msg_data)
                         print(f'{msg.sender} enviou {len(msg_data)} bytes para {self.addr}')
