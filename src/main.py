@@ -1,6 +1,8 @@
 import threading as thr
 import node as nd
 import filechunk as fc
+import numpy as np
+import time
 
 BASE_PORT = 30000
 CMD_PREFIX = '>> '
@@ -11,13 +13,19 @@ if __name__ == "__main__":
     threads = []
     node_count = int(input('Node count: '))
     for i in range(node_count):
-        nodes.append(nd.Node(('127.0.0.1', BASE_PORT+i)))
+        nodes.append(nd.Node(('127.0.0.1', 0)))
         threads.append(thr.Thread(target=nodes[i].listen))
-    for t in threads:
-        t.start()
+    for i in range(node_count):
+        threads[i].start()
+        while nodes[i].id == None: # Sincronização
+            time.sleep(5e-3)
 
-    for i in range(1, node_count):
-        nodes[i].enter_dht(nodes[0].addr)
+    try:
+        for i in range(1, node_count):
+            nodes[i].enter_dht(nodes[0].addr)
+    except TimeoutError:
+        for node in nodes:
+            print(f'{node.prev} (prev) - {node.addr} - {node.next} (next)')
     
     cmd = input(CMD_PREFIX)
     while cmd != 'exit':
@@ -37,6 +45,14 @@ if __name__ == "__main__":
         elif cmd == 'get' and len(args) == 2:
             song = MUSIC[int(args[0])]
             fc.get_file(args[1], song, [node.addr for node in nodes])
+        elif cmd == 'count':
+            chunk_count = [len(node.dict) for node in nodes]
+            if len(args) == 1 and args[0] == 'std':
+                print(np.std(chunk_count))
+            else:
+                print(chunk_count)
         cmd = input(CMD_PREFIX)
     for node in nodes:
         node.alive = False
+    for t in threads:
+        t.join()

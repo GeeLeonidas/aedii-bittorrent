@@ -3,7 +3,10 @@ import pickle as pk
 from message import Message, ChunkMessage
 import message
 import sys
-from filechunk import CHUNK_SIZE, convert_filename
+from filechunk import convert_filename
+from socket import error as SocketError
+import errno
+import time
 
 
 def get_node_id(addr: tuple[str, int]) -> int:
@@ -29,11 +32,12 @@ def get_distances(target_id: int, current_id: int) -> tuple[int, int]:
 class Node:
     def __init__(self, addr: tuple):
         self.addr = addr
-        self.id = get_node_id(addr)
+        self.id = None
         self.prev = None
         self.next = None
-        self.alive = True
+        self.alive = False
         self.dict = {} # Cada entrada deve ter o formato (filename : str, idx : int)
+        self.bytes_recv = 0 # Métrica para testes
 
 
     def __node_to_key(self, key_id: int) -> tuple[int, int, int]:
@@ -77,6 +81,7 @@ class Node:
             response_msg_data = s.recv(1024)
             response_msg: Message = pk.loads(response_msg_data)
             assert response_msg.type == message.OK ## Útil para debug
+            self.bytes_recv += len(response_msg_data)
     def echo(self):
         self.__echo(self.addr)
     
@@ -88,18 +93,20 @@ class Node:
             file_response = s.recv(1024)
             msg: Message = pk.loads(file_response)
             print(msg.type == message.FILE_FOUND)
+            self.bytes_recv += len(file_response)
 
 
     def enter_dht(self, known_node: tuple):
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
             s.connect(known_node)
             self.__send_new_node_message(s, self.addr)
+            s.settimeout(5)
             response_msg_data = s.recv(1024)
             response_msg: Message = pk.loads(response_msg_data)
             assert response_msg.type == message.OK
+            self.bytes_recv += len(response_msg_data)
 
 
-    # TODO: Diminuir o número de casos específicos dos if's
     def __handle_message(self, msg: Message, clSocket):
         if msg.type == message.ECHO:
             ip, port = msg.content.split(':')
@@ -124,6 +131,7 @@ class Node:
                     response_msg_data = s.recv(1024)
                     response_msg: Message = pk.loads(response_msg_data)
                     assert response_msg.type == message.OK ## Útil para debug
+                    self.bytes_recv += len(response_msg_data)
             else: # Caso geral
                 new_id = get_node_id(addr)
                 if new_id == self.id:
@@ -162,6 +170,7 @@ class Node:
                         self.prev = (prev_ip, int(prev_port))
                     else:
                         assert response_msg.type == message.OK ## Útil para debug
+                    self.bytes_recv += len(response_msg_data)
         elif msg.type == message.FIND_FILE:
             filename, index = msg.content.split(':')
             key = (filename, int(index))
@@ -196,6 +205,7 @@ class Node:
                     s.sendall(pk.dumps(msg))
                     response_msg_data = s.recv(1024)
                     clSocket.sendall(response_msg_data) # Repasse a resposta recebida
+                    self.bytes_recv += len(response_msg_data)
             return
         elif msg.type == message.PUT_FILE:
             self.__respond_ok_message(clSocket)
@@ -206,6 +216,7 @@ class Node:
                     break
                 response_msg_data += suffix_data
             response_msg: ChunkMessage = pk.loads(response_msg_data)
+            self.bytes_recv += len(response_msg_data)
             key_id = get_chunk_id(response_msg.key)
             if self.prev != None:
                 self_dist, prev_dist, next_dist = self.__node_to_key(key_id)
@@ -224,8 +235,11 @@ class Node:
   
 
     def listen(self):
+        self.alive = True
         with skt.socket(skt.AF_INET, skt.SOCK_STREAM) as s:
             s.bind(self.addr)
+            self.addr = s.getsockname()
+            self.id = get_node_id(self.addr)
             s.listen()
             s.settimeout(1) # Adiciona um delay (em seg.) para ele verificar se `self.alive` é verdadeiro
             while self.alive:
@@ -235,9 +249,15 @@ class Node:
                     continue
                 with conn:
                     while True:
-                        msg_data = conn.recv(1024)
+                        try:
+                            msg_data = conn.recv(1024)
+                        except SocketError as e:
+                            if e.errno != errno.ECONNRESET:
+                                raise
+                            continue
                         if not msg_data: # Finalizou a conexão
                             break
                         msg: Message = pk.loads(msg_data)
+                        self.bytes_recv += len(msg_data)
                         print(f'{msg.sender} enviou {len(msg_data)} bytes para {self.addr}')
                         self.__handle_message(msg, conn)

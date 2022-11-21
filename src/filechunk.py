@@ -36,7 +36,8 @@ def convert_filename(filename: str):
             filename_conv[28], filename_conv[29], filename_conv[30], filename_conv[31])
 
 ## Adiciona todos os pedaços de um arquivo à DHT
-def add_file(path : str, filename: str , ip_list : list):
+## Retorna: Quantidade de pedaços do arquivo
+def add_file(path : str, filename: str , ip_list : list) -> int:
     # ip list é uma lista de tuplas (ip, porta)
     idx = 0
     chunk = get_chunk(f'{path}/{filename}', 0)
@@ -69,6 +70,7 @@ def add_file(path : str, filename: str , ip_list : list):
 
         idx += 1
         chunk = get_chunk(f'{path}/{filename}', idx)
+    return idx
 
 ## Reconstroi o arquivo a partir da lista de hashes
 def reconstruct_file(path: str, filename: str, chunks: list):
