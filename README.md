@@ -1,6 +1,6 @@
 ## Problemas conhecidos
 - Caso seja executada no Windows, o limite da rede artificial é de 2 nós (pois o sistema impede a abertura de portas adicionais).
-- Caso utilize-se de uma porta aleatória para o nó (inserindo 0 como valor), a rede pode apresentar comportamento imprevisível, pois recebe pacotes indesejados  de outros programas que rompem com a lógica da implementação.
+- Caso utilize-se de uma porta aleatória para o nó (inserindo 0 como valor), a rede pode apresentar comportamento imprevisível, pois recebe pacotes indesejados de outros programas que rompem com a lógica da implementação.
 
 ## Ambiente utilizado
 - Python 3.10.8
